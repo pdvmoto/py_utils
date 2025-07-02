@@ -98,7 +98,6 @@ def ora_sess_info ( the_conn ):
   # 
   sql_stats = """
     select sn.name, st.value
-    --, st.* 
     from v$mystat st
     , v$statname sn
     where st.statistic# = sn.statistic# 
@@ -116,14 +115,13 @@ def ora_sess_info ( the_conn ):
         or sn.name like '%sorts%'
         or sn.name like '%physical reads'
         )
-      order by sn.name 
-  """
+      order by sn.name """
 
-  print ( ' ora_sess_info: Report out Session Stats ' ) 
+  print ( ' ora_sess_info: Report out Session Stats ')
+  print ( ' ora_sess_info:     Value  Stat name \n ora_sess_info:   -------- -------------' ) 
 
   cur_stats = the_conn.cursor()
   for row in cur_stats.execute ( sql_stats ):
-    # p   ( ' stats : ', row[1], ' ', row[0] )
     print   ( ' ora_sess_info: ', f"{row[1]:8.0f}  {row[0]}"   )
 
   return 0 # -- -- -- -- ora_sess_info
@@ -158,13 +156,13 @@ def ora_aas_chk ( conn_obj):
   ora_aas_threshold_pct    = float ( str ( os.getenv ( 'ORA_AAS_THRESHOLD_PCT' ) ) )
   ora_aas_pause_sec        = int   ( str ( os.getenv ( 'ORA_AAS_PAUSE_SEC'     ) ) )
 
-  print ( ' ora_aas : from env, thrshld: ', ora_aas_threshold_pct, ', ora_aas_pause: ', ora_aas_pause_sec )
+  print ( ' ora_aas: from env, thrshld: ', ora_aas_threshold_pct, ', ora_aas_pause: ', ora_aas_pause_sec )
 
   # get the values from database..
   cur_aas = conn_obj.cursor()
   for row in cur_aas.execute ( ora_aas_query ):
     
-    # print   ( ' ora_aas : info found epoch and dbtime: ', f"{row[1]}  {row[0]}"   )
+    # print   ( ' ora_aas: info found epoch and dbtime: ', f"{row[1]}  {row[0]}"   )
     # should only be 1 row...
  
     dbtime_ms = int ( row[0] )
@@ -172,7 +170,7 @@ def ora_aas_chk ( conn_obj):
   
   # end for-cursor, should only be 1
 
-  print ( ' ora_aas : dbtime: ', dbtime_ms, ', epoch: ', epoch_s )
+  print ( ' ora_aas: dbtime: ', dbtime_ms, ', epoch: ', epoch_s )
 
   # when not ini, just pause
   # else, if already init: determine if pause wanted..
@@ -192,18 +190,18 @@ def ora_aas_chk ( conn_obj):
        / ( delta_epoch_s * 1000 ) 
      )
 
-    print ( ' ora_aas : delta_dbtime_ms =', delta_dbtime_ms )
-    print ( ' ora_aas : delta_epoch_s   =', delta_epoch_s )
-    print ( ' ora_aas : aas_pct         =', aas_pct )
+    print ( ' ora_aas: delta_dbtime_ms =', delta_dbtime_ms )
+    print ( ' ora_aas: delta_epoch_s   =', delta_epoch_s )
+    print ( ' ora_aas: aas_pct         =', aas_pct )
 
     if aas_pct > ora_aas_threshold_pct:
 
-      print ( ' ora_aas : need pause - yes ' )
+      print ( ' ora_aas: need pause - yes ' )
       time.sleep ( ora_aas_pause_sec ) 
 
     else:
 
-      print ( ' ora_aas : dont need pause  - no' ) 
+      print ( ' ora_aas: dont need pause  - no' ) 
 
     # endif, needed pause or not
 
@@ -216,7 +214,7 @@ def ora_aas_chk ( conn_obj):
   end_ms = time.time() * 1000
   duration_ms = end_ms - start_ms
 
-  print ( ' ora_aas : done, return duration: ', duration_ms )
+  print ( ' ora_aas: done, return duration: ', duration_ms )
 
   return duration_ms
 
