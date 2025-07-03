@@ -22,6 +22,7 @@ def f_prfx():
 # local utilities, keep/cp in same directory for now...
 from  duration      import *
 from  inspect_obj   import *
+from  throttle      import *
 from  prefix        import *
 from  ora_login     import *
 
@@ -108,5 +109,30 @@ time.sleep ( 2)
 
 pp    ( 'process_time     : ' , time.perf_counter()  ) 
 pp    ( 'process_time_ns  : ' , time.perf_counter_ns() ) 
+
+print ( ) 
+print ( ' -- testing throttle, from ', datetime.now(), ' ...  -- ' )
+
+retval = f_throttle ()
+
+print ( ) 
+print ( ' -- tested throttle, now ', datetime.now(), ', slept: ', retval, ' ...  -- ' )
+print ( ) 
+print ( ' -- testing 2nd throttle, from ', datetime.now(), ' ...  -- ' )
+print ( ) 
+
+f_throttle ()
+
+print ( ' -- tested 2nd throttle, now ', datetime.now(), ' ...  -- ' )
+print ( ) 
+
+print ( ' -- testing sleep visual .. ' )
+print ( ' ')
+f_sleep_visual ( 5 )
+print ( ' ')
+print ( ' -- tested  sleep visual .. ' )
+print ( ' ')
+
+
 
 pp    ( ' ----- testing done..  ---- ' ) 

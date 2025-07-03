@@ -1,7 +1,13 @@
 #
-# throttle.py: allow sleep-time to be read , and inserted into program
+# throttle.py: read sleep-time from .env and sleep to pause into program
 # 
-# usage: 
+# usage:  
+#   from throttle import *
+# requires: 
+#     time, datetiome, dotenv
+#     a line in .env, with THR_SLEEP_TIME=3
+#
+# purpose:
 #   to slow down a running job: insert calls to f_throttle, and edit .env
 #   later: use *args to pass options..
 # 
@@ -20,7 +26,7 @@ import      os
 import      time
 from        datetime    import  datetime
 
-from        dotenv   import load_dotenv
+from        dotenv      import load_dotenv
 
 
 # define variables, they shoulds be global...
@@ -30,11 +36,13 @@ g_thr_ep_next_reload     = time.time()     # epoch, when reload needed
 
 
 def f_sleep_visual( nsec):
-
+  #
+  # this prints dots while sleeping to provide some feedback
+  #
   n_counter = 0
   start_ep = time.time()  # using epoch, ok ?
 
-  print ( '.. sleep_visual [msg] ', nsec, ' sec ', end='', flush=True )
+  print ( '-- sleep_visual [msg] ', nsec, ' sec ', end='', flush=True )
 
   # using while-time instead of counter to be more exact?
   while time.time() < (start_ep + nsec ):
@@ -44,7 +52,7 @@ def f_sleep_visual( nsec):
     
   # end while...
 
-  print ( '\n -- sleep_visual , end ', datetime.now() )
+  print ( '\n-- sleep_visual, end ', datetime.now() )
 
   return nsec # -- end of visual, printed dot per second
 
@@ -61,7 +69,7 @@ def f_throttle():
   dt_now = datetime.now()
 
   print ()
-  print ( ' -- start throttle -- ', dt_now )
+  print ( ' -- throttle: start ', dt_now )
   print ()
 
   if  time.time() > g_thr_ep_next_reload:
@@ -76,11 +84,13 @@ def f_throttle():
 
   # reload done now go sleep..
 
-  # if sleep more then, say, 10sec, add visual dots.. ?
+  print ( ' -- throttle: go sleep  ', g_thr_sleep_time, ' sec.' )
+
+  # note: if sleep more then, say, 10sec, add visual dots ?
 
   time.sleep ( g_thr_sleep_time ) 
 
-  print ( ' -- end throttle, slept: ', g_thr_sleep_time )
+  print ( ' -- throttle: slept for ', g_thr_sleep_time, ' sec.' )
 
   return g_thr_sleep_time # ---- end of f_throttle ----
 
@@ -107,7 +117,7 @@ if __name__ == '__main__':
 
   print ( ' -- testing sleep visual .. ' )
   print ( ' ')
-  f_sleep_visual ( 7 )
+  f_sleep_visual ( 5 )
   print ( ' ')
   print ( ' -- tested  sleep visual .. ' )
   print ( ' ')
