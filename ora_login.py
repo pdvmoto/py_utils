@@ -116,6 +116,7 @@ def ora_sess_info ( the_conn ):
         or sn.name like 'opened cursors curr%'
         or sn.name like '%sorts%'
         or sn.name like '%physical reads'
+        or sn.name like 'DB time'
         )
       order by sn.name 
     """
