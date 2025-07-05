@@ -10,15 +10,19 @@ pyfile = sys.argv[0]
 
 def f_prfx():
   # set a prefix for debug-output, sourcefile + timestamp
+  # minimal overhead, nanoseconds per call, see self-test below.
 
+  # bring the two lines back to 1, and 10% overhead goes away?
   # s_timessff = str ( datetime.now() )[11:26]
   # s_prefix = pyfile + ' ' + s_timessff + ' '
 
-  s_prefix = pyfile + ' ' + str ( datetime.now() )[11:26]
+  # even one line is stil some overhead...
+  # s_prefix = pyfile + ' ' + str ( datetime.now() )[11:26]
 
   # print ( prfx, ' in function f_prfx: ' , s_prefix )
 
-  return str ( s_prefix )
+  # return str ( s_prefix )
+  return ( pyfile + ' ' + str ( datetime.now() )[11:26] )
 
 # ---- end of f_prfx, set sourcefile and timestamp ----
 
@@ -29,6 +33,7 @@ def pp ( *argv ):
 
 if __name__ == '__main__':
 
+  pp    ( ' ' )
   pp    ( ' ----- prefix: self-test starting. ----- ' ) 
   pp    ( ' ' )
   pp    ( 'prefix is: [' + f_prfx() + '] ( - string-concatenated with + )' )
@@ -44,7 +49,7 @@ if __name__ == '__main__':
 
   pp    ( ' ' )
 
-  test_max = 1000000
+  test_max = 500000
   test_cnt = 0
 
   pp ( ' ' )
