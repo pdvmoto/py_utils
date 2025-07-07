@@ -5,7 +5,7 @@
 # this prefix seems to remain local to functions in the file?
 
 def f_prfx():
-  return "inspect_obj (selftest) : "
+  return "inspect_obj : "
 
 def f_inspect_obj( s_objname, o_obj ):
 
@@ -39,7 +39,6 @@ def f_inspect_obj( s_objname, o_obj ):
 # self-test..
 
 if __name__ == '__main__':
-
 
   print ()
   print ( f_prfx(), ' ----- Self Test of inpect_obj ------ ' ) 
