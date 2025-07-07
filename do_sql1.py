@@ -35,8 +35,8 @@
 # - lots more, but not prio atm
 #
 
-print ( ' ' ) 
-print ( '--------- do_sql.py: enter manual queries... ---------- ' )
+# print ( ' ' ) 
+# print ( '--------- do_sql.py: enter manual queries... ---------- ' )
 
 import    os
 import    sys
@@ -48,23 +48,23 @@ from      dotenv        import load_dotenv
 
 import    oracledb 
 
-print ( ' ' )
-print ( "--------- generic imports done  -------------- " )
+# print ( ' ' )
+# print ( "--------- generic imports done  -------------- " )
 
 from      duration      import *
 from      prefix        import *
 from      ora_login     import *
 
 
-pp    ( ' ' )
-pp    ( "--------- local utilities imports done  -------------- " )
+# pp    ( ' ' )
+# pp    ( "--------- local utilities imports done  -------------- " )
 
 #
 # any constants or global (module-wide) definitions go here...
 #
 
-pp    ( ' ' ) 
-pp    ( '--------- constants and globals defined ... ---------- ' )
+# pp    ( ' ' ) 
+# pp    ( '--------- constants and globals defined ... ---------- ' )
 
 
 # ---- chop off semicolon ---- 
@@ -92,7 +92,7 @@ def output_type_handler(cursor, metadata):
 
 
 pp    ( ' ' ) 
-pp    ( '--------- functions defined, start of main..  ---------- ' )
+pp    ( '--------- start of main..  ---------- ' )
 
 ora_conn = ora_logon () 
   
@@ -130,7 +130,7 @@ sql_for_qry = chop_off_semicolon ( sql_for_qry )
 pp    ( ' ' )
 pp    ( '.. processing...' )
 pp    ( ' ' )
-pp    ( 'Rownr (Content)' )
+pp    ( 'Rownr Content' )
 pp    ( '----- ----------... ' )
 
 cursor = ora_conn.cursor()
@@ -138,11 +138,10 @@ for row in cursor.execute ( sql_for_qry ):
   pp   ( f"{cursor.rowcount:5d}", row )
 
 pp    ( ' ' )
-pp    ( '..', cursor.rowcount, ' rows processed.' ) 
+pp    ( '.. ', cursor.rowcount, ' rows processed.' ) 
 pp    ( ' ' ) 
 pp    ( '.. Query was : -[', sql_for_qry, ']-' )
 
-# pp    ( ' ' ) 
 # ora_sess_info ( ora_conn )
 
 pp    ( ' ' ) 
