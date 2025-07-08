@@ -8,6 +8,11 @@
 # - include ora_aas: find aas and allow throttling/sleep.
 #   if no aas-found, no conn, simply pause bcse no useful work possible
 # 
+# info: unless prefetch is increased,... 
+#   Apparently connect takes 2 round trips.
+#   the "show prompt" takes 2 round trips
+#   and ora_sess_info also takes 2 round trips
+#
 
 import    os
 import    time
@@ -84,6 +89,7 @@ def ora_logon ( *args ):
   print    ( ' ora_login: --- Connection is: --->' )
 
   cursor = ora_conn.cursor()
+  cursor.prefetchrows = 10      # set array to limit round trips
   for row in cursor.execute ( sql_show_conn ):
     print  ( ' ora_login:', row[1] )
 
@@ -125,6 +131,7 @@ def ora_sess_info ( the_conn ):
   print ( ' ora_sess_info:     Value  Stat name \n ora_sess_info:   -------- -------------' ) 
 
   cur_stats = the_conn.cursor()
+  cur_stats.prefetchrows = 20      # set array to limit round trips
   for row in cur_stats.execute ( sql_stats ):
     # print ( ' stats : ', row[1], ' ', row[0] )
     print   ( ' ora_sess_info: ', f"{row[1]:8.0f}  {row[0]}"   )
@@ -282,11 +289,17 @@ if __name__ == '__main__':
 
   time.sleep( 10 )
 
-  while ora_aas_chk ( ora_conn ) > 1000:  # sleep and only release when Below Threshold.
+  while ora_aas_chk ( ora_conn ) > 1000:  # sleep and only release when AAS Below Threshold.
     pass
 
   print ()
   print ( ' ---- ora_logon: check the stats, for current sesion ---- ' ) 
+  print ()
+
+  ora_sess_info ( ora_conn )
+
+  print ()
+  print ( ' ---- ora_logon: re-check the stats, measure overhead of sess_info ---- ' ) 
   print ()
 
   ora_sess_info ( ora_conn )

@@ -142,8 +142,8 @@ pp    ( '..', cursor.rowcount, ' rows processed.' )
 pp    ( ' ' ) 
 pp    ( '.. Query was : -[', sql_for_qry, ']-' )
 
-# pp    ( ' ' ) 
-# ora_sess_info ( ora_conn )
+pp    ( ' ' ) 
+ora_sess_info ( ora_conn )
 
 pp    ( ' ' ) 
 pp    ( '---- end of do_sql.py ---- ' )
