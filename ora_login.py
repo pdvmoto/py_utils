@@ -75,7 +75,7 @@ def ora_logon ( *args ):
   # verify... dont print this at work.
   print    ( ' ora_login: ' ) 
   print    ( ' ora_login: ' + ora_user + ' / **************** @ ' 
-           + ora_server + ' ; ' + ora_port + ' \\ ' + ora_sid )
+           + ora_server + ' ; ' + ora_port + ' / ' + ora_sid )
 
   # create the actual connection
   ora_conn = oracledb.connect (
@@ -102,6 +102,13 @@ def ora_logon ( *args ):
 def ora_sess_info ( the_conn ):
   # 
   # output network and other stats from session 
+  #
+  # note the overhead of this call: 
+  #  1 round trip (optimized prefetch )
+  #  1 user call 
+  #  1 execute  
+  #  1 sort (memory)
+  #  other overhead depends on how many rows..
   # 
   sql_stats = """
     select sn.name, st.value
@@ -109,19 +116,19 @@ def ora_sess_info ( the_conn ):
     from v$mystat st
     , v$statname sn
     where st.statistic# = sn.statistic# 
-    and (  sn.name like '%roundtrips%'
-        or sn.name like 'bytes sent%client'
-        or sn.name like 'bytes rece%client'
+    and (  sn.name like '%roundtrips%client%'
+        -- or sn.name like 'bytes sent%client'
+        -- or sn.name like 'bytes rece%client'
         or sn.name like '%execute count%'
         or sn.name like 'user calls'
-        or sn.name like 'user commits'
-        or sn.name like 'user rollbacks'
-        or sn.name like 'consistent gets'
-        or sn.name like 'db block gets'
-        or sn.name like 'opened cursors current'
-        or sn.name like 'opened cursors curr%'
-        or sn.name like '%sorts%'
-        or sn.name like '%physical reads'
+        --or sn.name like 'user commits'
+        --or sn.name like 'user rollbacks'
+        -- or sn.name like 'consistent gets'
+        -- or sn.name like 'db block gets'
+        -- or sn.name like 'opened cursors current'
+        -- or sn.name like 'opened cursors curr%'
+        -- or sn.name like '%sorts%'
+        -- or sn.name like '%physical reads'
         or sn.name like 'DB time'
         )
       order by sn.name 
