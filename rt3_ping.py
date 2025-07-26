@@ -176,7 +176,7 @@ pp    ()
 
 # for n_seconds ..
 
-n_sec = 10 
+n_sec = 3 
 
 f_do_pings ( n_sec )
 

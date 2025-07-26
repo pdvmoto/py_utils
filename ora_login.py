@@ -24,6 +24,7 @@ from      dotenv   import load_dotenv
 #
 # ora_logon       : use dotenv to get credentials and logon
 # ora_sess_info   : get some session stats (since logon of sess..)
+# ora_sess_inf2   : advanced version
 #
 # ora_aas_chk     : set env and check system-load, pause if needed. 
 
@@ -117,10 +118,10 @@ def ora_sess_info ( the_conn ):
     , v$statname sn
     where st.statistic# = sn.statistic# 
     and (  sn.name like '%roundtrips%client%'
-        -- or sn.name like 'bytes sent%client'
-        -- or sn.name like 'bytes rece%client'
-        or sn.name like '%execute count%'
-        or sn.name like 'user calls'
+           or sn.name like 'bytes sent%client'
+           or sn.name like 'bytes rece%client'
+           or sn.name like '%execute count%'
+           or sn.name like 'user calls'
         --or sn.name like 'user commits'
         --or sn.name like 'user rollbacks'
         -- or sn.name like 'consistent gets'
@@ -129,9 +130,22 @@ def ora_sess_info ( the_conn ):
         -- or sn.name like 'opened cursors curr%'
         -- or sn.name like '%sorts%'
         -- or sn.name like '%physical reads'
+        or sn.name like '%arse count (hard%'
         or sn.name like 'DB time'
         )
-      order by sn.name 
+    UNION ALL
+    select ' ~ ', 0
+    union all
+    select ' ' || stm.stat_name || ' (micro-sec)'
+         , stm.value
+    from v$sess_time_model  stm
+    where stm.sid =  sys_context('userenv', 'sid')
+      and (  stm.stat_name like 'DB time'
+          or stm.stat_name like 'DB CPU'
+          or stm.stat_name like 'sql execu%'
+          or stm.stat_name like 'PL/SQL execu%'
+          )
+    order by 1
     """
 
   print ( ' ora_sess_info: Report out Session Stats ')
@@ -144,6 +158,55 @@ def ora_sess_info ( the_conn ):
     print   ( ' ora_sess_info: ', f"{row[1]:8.0f}  {row[0]}"   )
 
   return 0 # -- -- -- -- ora_sess_info
+
+# -- -- -- ora_sess_inf2 : the advanced version.. -- -- -- 
+
+def ora_sess_inf2 ( the_conn ):
+  # 
+  # output network and other stats from session 
+  #
+  # note the overhead of this call: 
+  #  x round trip (optimized prefetch )
+  #  x user call 
+  #  x execute  
+  #  x sort (memory)
+  #  other overhead depends on how many rows..
+  # 
+  sql_stats = """
+    select sn.name, st.value
+    -- , st.*
+    from v$mystat st
+    , v$statname sn
+    where st.statistic# = sn.statistic# 
+    and (  sn.name like '%roundtrips%client%'
+           or sn.name like 'bytes sent%client'
+           or sn.name like 'bytes rece%client'
+           or sn.name like '%execute count%'
+           or sn.name like 'user calls'
+        --or sn.name like 'user commits'
+        --or sn.name like 'user rollbacks'
+        -- or sn.name like 'consistent gets'
+        -- or sn.name like 'db block gets'
+        -- or sn.name like 'opened cursors current'
+        -- or sn.name like 'opened cursors curr%'
+        -- or sn.name like '%sorts%'
+        -- or sn.name like '%physical reads'
+        or sn.name like '%arse count (hard%'
+        or sn.name like 'DB time'
+        )
+      order by sn.name 
+    """
+
+  print ( ' ora_sess_info: Report out Session Stats ')
+  print ( ' ora_sess_info:     Value  Stat name \n ora_sess_info:   -------- -------------' ) 
+
+  cur_stats = the_conn.cursor()
+  cur_stats.prefetchrows = 30      # set array to limit round trips
+  for row in cur_stats.execute ( sql_stats ):
+    print   ( ' ora_sess_info: ', f"{row[1]:10.0f}  {row[0]}"   )
+
+  return 0 # -- -- -- -- ora_sess_info
+
 
 
 # -- --  ora_aas -- -- 
@@ -255,6 +318,7 @@ def ora_aas_chk ( conn_obj):
   print ( 'ora_aas: done, duration was: ', duration_ms, ' ms.' )
 
   return duration_ms  # -- end of function ora_aas_chk, return duration
+
 
 # ---- some  test code below... ---- 
 
