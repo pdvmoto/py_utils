@@ -1,4 +1,4 @@
-#
+
 # ora_login.py: , using .env, dotenv, and return the connection.
 # another way of isolating the logon cred + avoid typing code
 #
@@ -141,8 +141,8 @@ def ora_sess_info ( the_conn ):
     , v$statname sn
     where st.statistic# = sn.statistic# 
     and (     sn.name like '%roundtrips%client%'
-           or sn.name like 'bytes sent%client'
-           or sn.name like 'bytes rece%client'
+        -- or sn.name like 'bytes sent%client'
+        -- or sn.name like 'bytes rece%client'
            or sn.name like '%execute count%'
            or sn.name like 'user calls'
         --or sn.name like 'user commits'
@@ -175,7 +175,7 @@ def ora_sess_info ( the_conn ):
   print ( ' ora_sess_info:     Value  Stat name \n ora_sess_info:   -------- -------------' ) 
 
   cur_stats = the_conn.cursor()
-  cur_stats.prefetchrows = 20      # set array to limit round trips
+  cur_stats.prefetchrows = 30      # set array to limit round trips
 
   # optional: parse to test the cursor.. return on err..j
   # but only when needed: it is 1 extra RT
@@ -189,6 +189,9 @@ def ora_sess_info ( the_conn ):
 
 # -- -- -- ora_sess_inf2 : the advanced version.. -- -- -- 
 
+
+g_sess_info_dict = {}           # keep global for re-use over calls
+
 def ora_sess_inf2 ( the_conn ):
   # 
   # output network and other stats from session 
@@ -200,7 +203,12 @@ def ora_sess_inf2 ( the_conn ):
   #  x sort (memory)
   #  other overhead depends on how many rows..
   # 
-  sql_stats = """
+
+  global g_sess_info_dict           # keep info over calls
+  sess_info_next = {}             # local, recent data.
+
+  # make this sql external, save space, and share with others
+  sql_stats2 = """
     select sn.name, st.value
     -- , st.*
     from v$mystat st
@@ -225,15 +233,33 @@ def ora_sess_inf2 ( the_conn ):
       order by sn.name 
     """
 
-  print ( ' ora_sess_info: Report out Session Stats ')
-  print ( ' ora_sess_info:     Value  Stat name \n ora_sess_info:   -------- -------------' ) 
+  print ( ' ora_sess_inf2:   -- -- Session Stats -- -- ')
+  print ( ' ora_sess_inf2:     Value  Stat name \n ora_sess_info:   -------- -------------' ) 
 
+  sess_info_now = {}
   cur_stats = the_conn.cursor()
   cur_stats.prefetchrows = 30      # set array to limit round trips
-  for row in cur_stats.execute ( sql_stats ):
-    print   ( ' ora_sess_info: ', f"{row[1]:10.0f}  {row[0]}"   )
+  for row in cur_stats.execute ( sql_stats2 ):
 
-  return 0 # -- -- -- -- ora_sess_info
+    print   ( ' ora_sess_info: ', f"{row[1]:10.0f}  {row[0]}"   )
+    # add to dict..for next  time
+    sess_info_now [ row[0] ] = row[1]
+
+  # debug stuff.
+  print ( ' ora_sess_inf2; ', len ( sess_info_now ), ' new items' ) 
+  print ( ' ora_sess_inf2; ', len ( g_sess_info_dict ), ' existing items' ) 
+  
+  # if prev version exists: show diffs
+  if ( len ( g_sess_info_dict ) > 0 ):
+
+    for stat_key in g_sess_info_dict: 
+      diff = sess_info_now [ stat_key ] - g_sess_info_dict [ stat_key ] 
+      print ( ' ora_inf2: ', stat_key, ' : ', diff )  
+ 
+  # keep dict for next call
+  g_sess_info_dict = dict ( sess_info_now )
+
+  return 0 # -- -- -- -- ora_sess_inf2
 
 
 
@@ -382,11 +408,13 @@ if __name__ == '__main__':
   print ( ' ---- ora_logon: tested count *  user_objects, do 1 more aas ---- ' ) 
   print ()
 
+  n_sec = 2
+
   print ()
-  print ( ' ---- ora_logon: re-check ora_aas in 10sec, using while ---- ' ) 
+  print ( ' ---- ora_logon: re-check ora_aas in ', n_sec, 'sec, using while ---- ' ) 
   print ()
 
-  time.sleep( 10 )
+  time.sleep( n_sec )
 
   while ora_aas_chk ( ora_conn ) > 1000:  # sleep and only release when AAS Below Threshold.
     pass
@@ -402,6 +430,13 @@ if __name__ == '__main__':
   print ()
 
   ora_sess_info ( ora_conn )
+
+  print ()
+  print ( ' ---- ora_logon: test the DICT-version of seession_info ---- ' ) 
+  print ()
+
+  ora_sess_inf2 ( ora_conn )
+  ora_sess_inf2 ( ora_conn )
 
   print ()
   print ( ' ---- ora_sess_info: tested with current session ---- ' ) 
