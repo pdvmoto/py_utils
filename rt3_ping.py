@@ -19,7 +19,7 @@ def f_prfx():
   return " localprfx: "
 
 # local utilities, keep/cp in same directory for now...
-# from  duration      import *
+from  duration      import *
 # from  inspect_obj   import *
 from  prefix        import *
 from  ora_login     import *
@@ -188,6 +188,8 @@ pp    ()
 
 # show stats for this connection..
 ora_sess_info ( ora_conn )
+
+tmr_report_time () 
 
 pp    ()
 pp ( ' ----- roundtrips done -----' ) 

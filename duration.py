@@ -2,6 +2,15 @@
 import time
 from datetime import datetime 
 
+# try out some time-keepers.. 
+# assign these as early as possible
+g_durat_start     = time.time ()
+g_durat_prfcnt    = time.perf_counter ()
+g_durat_prfcnt_ns = time.perf_counter_ns ()
+g_durat_proctim   = time.process_time ()
+g_durat_proctim_ns = time.process_time ()
+  
+
 # duration.py: measure duration of programs or tasks.
 # 
 # usage: 
@@ -13,6 +22,7 @@ from datetime import datetime
 # - tmr_set()   : set point to measure, now(), also re-sset.. global_var: g_start_dur
 # - tmr_durat() : get duration in sec/ms since last set, the stopwatch inside the program
 # - tmr_spin()  : spin on full-CPU for nr of n_sec (can be float) - Spinning/running Wait...
+# - tmr_report_time () : show the available data on time-spent
 # 
 # todo: 
 # - investigate time vs datetime packages, prefer only 1
@@ -58,7 +68,31 @@ def tmr_spin ( spin_s: float ):
   # return ( end_t - start_t )                #  with just time.time()
   return ( datetime.now().timestamp() - start_t )      # didnt need timestamp-funciton with just time.time()
 
-# ----- timers defined ---- 
+def tmr_report_time ():
+
+  # try out some time-keepers..
+  # print ( ' duration:  elapsed   : ', ( time.time()            - g_durat_start       ), 'sec.. (user)' ) 
+  # print ( ' duration:  percntr   : ', ( time.perf_counter()    - g_durat_prfcnt      ), 'sec..' ) 
+  # print ( ' duration:  percntr_ns: ', ( time.perf_counter_ns() - g_durat_prfcnt_ns  ), 'ns..' ) 
+  # print ( ' duration:  proctim   : ', ( time.process_time()    - g_durat_proctim    ), 'sec..' ) 
+  # print ( ' duration:  proctim_ns: ', ( time.process_time_ns() - g_durat_proctim_ns ), 'ns..' ) 
+
+  n_real_sec = round ( ( time.time()         - g_durat_start    ), 3 )
+  n_user_sec = round ( ( time.process_time() - g_durat_proctim  ), 3 )
+  n_idle_sec = round ( n_real_sec - n_user_sec, 3 )
+
+  # linux style output
+  print ( '\n duration: approx linux time output: ' )
+  print (   ' duration:   real  ', n_real_sec, 's' ) 
+  print (   ' duration:   user  ', n_user_sec, 's' ) 
+  print (   ' duration:   sys   ', '<???>',    's' ) 
+  print (   ' duration:                ', n_idle_sec, 's ... idle, waiting for "others" \n' )
+
+  # addition: show times similarto linux time.. 12m6.214s
+
+  return 0
+
+# ----- functions defined ---- 
 
 _hidden_var = 42  # This is "private" by convention
 
@@ -113,5 +147,22 @@ if __name__ == '__main__':
   # print ( ' - ' )
   # print ( 'pf_set : ', pf_set() ) 
 
+  print ( '\n --- testing timekeepeers, real/usr/sys..  --- ' ) 
+
+  # try out some time-keepers..
+  print ( ' --- --- raw data from timers.. --- --- ' )
+  print ( ' --- elapsed   : ', ( time.time()            - g_durat_start       ), 'sec..' ) 
+  print ( ' --- percntr   : ', ( time.perf_counter()    - g_durat_prfcnt      ), 'sec..' ) 
+  print ( ' --- percntr_ns: ', ( time.perf_counter_ns() - g_durat_prfcnt_ns  ), 'ns..' ) 
+  print ( ' --- proctim   : ', ( time.process_time()    - g_durat_proctim    ), 'sec..' ) 
+  print ( ' --- proctim_ns: ', ( time.process_time_ns() - g_durat_proctim_ns ), 'ns..' ) 
+
+  # use function to report real, user, idle..
+
   print ( '\n --- total4 : ', f"{tmr_total():3.6f}", '\t, total, wasnt reset,      3sec?')
-  print ( '\n --- end of self-test duration.py --- \n' ) 
+  print ( '\n --- end of self-test duration.py --- ' ) 
+
+  print ( '\n' )  
+  tmr_report_time ()
+  print ( '\n' )  
+

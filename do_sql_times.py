@@ -1,3 +1,7 @@
+# as early as possible..
+
+import time
+
 #
 # do_sql_times.py : enter a query and run it, print results
 #
@@ -62,8 +66,8 @@ print ( ' ' )
 
 from      prefix        import *
 from      ora_login     import *
+from      duration      import *
 
-# from    duration      import *
 # from    inspect_obj   import *
 
 pp    ( ' ' )
@@ -172,6 +176,7 @@ for row in cursor.execute ( sql_for_qry ):
   # diff_micro_sec  =  ( next_ns - start_ns ) / 1000          # we dont need round..
   diff_micro_sec  = round ( ( next_ns - start_ns ) / 1000 ) # we dont need round..
   start_ns        = next_ns
+  tmr_spin ( 0.001 )      # give it fraction of sec, to show some time worked..
   pp   ( f"{cursor.rowcount:5d}", f"{diff_micro_sec:12,.0f}"
        , row )
 
@@ -187,6 +192,9 @@ ora_sess_info ( ora_conn )
 # pp    ( ' proc_time [ns]: ',  f"{time.process_time_ns():13,.0f}" )
 # pp    ( ' tmr_total  [s]: ',  f"{tmr_total():3.6f}", '\t\t, total since set-start.' )
 # pp    ( ' ' )
+
+tmr_spin ( 2 )      # give it 2 sec, to show some time worked..
+tmr_report_time ()
 
 # pp    ( ' ' ) 
 pp    ( '---- end of do_sql.py ---- ' )

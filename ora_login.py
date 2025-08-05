@@ -2,8 +2,16 @@
 # ora_login.py: , using .env, dotenv, and return the connection.
 # another way of isolating the logon cred + avoid typing code
 #
+# grants needed: 
+#   grant select on v_$mystat, v_$version, v_$statname, v_$sess_time_model to ... 
+#   grant select on v_$sysstat, v_$parameter to ... 
+# 
 # todo: 
 # - later: allow un/pwd@host:port\sid to be passed, but prefer dotenv 
+# - how many other self-made includes should I depend on ?
+
+# - logon + sess_info: avoid errors on v$database, and include V$Version instead
+# - aas : dflt pause on (SQL)error, use cursor.parse to test..
 # - how many other self-made includes should I depend on ? 
 # - include ora_aas: find aas and allow throttling/sleep.
 #   if no aas-found, no conn, simply pause bcse no useful work possible
@@ -35,9 +43,10 @@ from      dotenv   import load_dotenv
 def ora_logon ( *args ):
 
   # customize this sql to show connetion info on logon
+  # note: re-worked to avoid ORA-00942 or priv-errors
   sql_show_conn="""
     select 2 as ordr
-       , 'version : ' ||  substr ( banner_full, -12) as txt
+       , 'version : ' ||  substr ( banner_full, -11) as txt
     from v$version
   UNION ALL
     select 1
@@ -46,7 +55,8 @@ def ora_logon ( *args ):
   UNION ALL
     SELECT 3
        , 'prompt  : ' || user
-         || ' @ ' ||db.name
+         || ' @ '  || global_name           -- ||db.name
+         -- || ' @ ' || REGEXP_SUBSTR(banner_full, 'version [^ ]+', 1, 1, 'i') 
          || ' @ '|| SYS_CONTEXT('USERENV','SERVER_HOST')
          || decode  (SYS_CONTEXT('USERENV','SERVER_HOST')
               , '98b6d46dd637',    ' (xe-dev)'
@@ -54,7 +64,7 @@ def ora_logon ( *args ):
               , '2c4a51017a44',    ' (dckr-23ai)'
               , ' (-envname-)')
          || ' > '
-    FROM    v$database      db
+    FROM   global_name  -- v$version      ver
   order by 1
   """
 
@@ -70,6 +80,10 @@ def ora_logon ( *args ):
   ora_port    = os.getenv ( 'ORA_PORT' )
   ora_sid     = os.getenv ( 'ORA_SID' )
 
+  # bonus: arraysize and prefetch, if available
+  ora_arraysize     = os.getenv ( 'ORA_ARRAYSIZE' )
+  ora_prefetchrows  = os.getenv ( 'ORA_PREFETCHROWS' )
+  
   # --- dotenv() specific ------------------------------
 
   # 
@@ -88,14 +102,23 @@ def ora_logon ( *args ):
   )
 
   print    ( ' ora_login: --- Connection is: --->' )
-
+  
   cursor = ora_conn.cursor()
-  cursor.prefetchrows = 10      # set array to limit round trips
+  cursor.prefetchrows = 10      # set prefetch to limit round trips
   for row in cursor.execute ( sql_show_conn ):
     print  ( ' ora_login:', row[1] )
 
   print    ( ' ora_login:  <-- Connection  ---- ' )
-  print    ( ' ora_login: ' ) 
+
+  # adjust array and prefetch if found via Dot-Env..
+  if (ora_arraysize is not  None ):
+    oracledb.defaults.arraysize    = int ( ora_arraysize )
+    print ( '\n ora_login: modified dflt Arraysize = ', ora_arraysize )
+  if ( ora_prefetchrows is not None ):
+    oracledb.defaults.prefetchrows    = int ( ora_prefetchrows ) 
+    print ( '\n ora_login: modified dflt Prefetchrows = ', ora_prefetchrows )
+
+  print   ( '\n  ora_login: ' ) 
 
   return ora_conn  # ------- logon and return conn object --- 
 
@@ -117,7 +140,7 @@ def ora_sess_info ( the_conn ):
     from v$mystat st
     , v$statname sn
     where st.statistic# = sn.statistic# 
-    and (  sn.name like '%roundtrips%client%'
+    and (     sn.name like '%roundtrips%client%'
            or sn.name like 'bytes sent%client'
            or sn.name like 'bytes rece%client'
            or sn.name like '%execute count%'
@@ -134,7 +157,7 @@ def ora_sess_info ( the_conn ):
         or sn.name like 'DB time'
         )
     UNION ALL
-    select ' ~ ', 0
+    select ' ~ ', 0 from dual
     union all
     select ' ' || stm.stat_name || ' (micro-sec)'
          , stm.value
@@ -153,6 +176,11 @@ def ora_sess_info ( the_conn ):
 
   cur_stats = the_conn.cursor()
   cur_stats.prefetchrows = 20      # set array to limit round trips
+
+  # optional: parse to test the cursor.. return on err..j
+  # but only when needed: it is 1 extra RT
+  # cur_stats.parse ( sql_stats )  
+
   for row in cur_stats.execute ( sql_stats ):
     # print ( ' stats : ', row[1], ' ', row[0] )
     print   ( ' ora_sess_info: ', f"{row[1]:8.0f}  {row[0]}"   )
@@ -236,7 +264,7 @@ ora_aas_query = """
 
 # check for AAS, determine if pause needed, return ms-duration 
 
-def ora_aas_chk ( conn_obj):
+def ora_aas_chk ( conn_obj ):
 
   start_ms = time.time() * 1000
 
