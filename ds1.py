@@ -1,13 +1,9 @@
-# as early as possible..
-
-from      duration      import *
-
 #
-# do_sql_times.py : enter a query and run it, print results
+# do_sql.py : enter a query and run it, print results
 #
 # background:
-#   clone of do_sql.py: run a g neric query.. 
-#   This verions is altered to "Measure" timings, and v$mystats.
+#   just bcse I need to learn, and I think may be useful
+#   also: I needded a test-template to test utilities..
 #
 # Stern Warning: 
 #   This tool uses "dynamic SQL", 
@@ -19,15 +15,7 @@ from      duration      import *
 # - no COMMIT, hence any DML will fail bcse no auto-commit, but..
 # - any DDL will Succeed! => big risk.
 #
-# todo: specific for timer-version
-#   - add perf_counter and process_time.
-#   - add microsec at each line
-#   - consider process-time at each line
-#   - proc-time into duration as separate measure.
-#   - python on mac stops at MicroSec, no need to display Nano..
-#   - ...
-#
-# todo (from generic do_sql.py) :
+# todo:
 # - use try-except to handle and report errors
 # - consider using credentials, conn_name, from SQLcl
 # - allow for a pager, and space / enter / nr to continue (never if arg-1 provided)
@@ -48,34 +36,34 @@ from      duration      import *
 #
 
 print ( ' ' ) 
-print ( '--------- do_sql_times.py: enter manual queries, test... ---------- ' )
+print ( '--------- do_sql.py: enter manual queries... ---------- ' )
 print ( ' ' ) 
 
 import    os
 import    sys
 import    array
 
-#import    time
+import    inspect 
+import    time
 from      datetime      import datetime
-from      dotenv        import load_dotenv
+# from      dotenv        import load_dotenv
 
 import    oracledb 
 
-print ( '--------- generic imports done  -------------- ' )
+print ( ' ' )
+print ( "--------- generic imports done  -------------- " )
 print ( ' ' )
 
+from      duration      import *
 from      prefix        import *
 from      ora_login     import *
-#from     duration      import *
+from      inspect_obj   import *
 
-# from    inspect_obj   import *
+
 
 pp    ( ' ' )
-pp    ( '--------- local utilities imports done  -------------- ' )
-
-# pp    ( ' proc_time_ns : ',  f"{time.process_time_ns():12,.0f}" )
-# pp    ( ' tmr_start    : ', tmr_start(), '\t\t, set the start-time.' )
-# pp    ( ' ' )
+pp    ( "--------- local utilities imports done  -------------- " )
+pp    ( ' ' )
 
 #
 # any constants or global (module-wide) definitions go here...
@@ -83,6 +71,64 @@ pp    ( '--------- local utilities imports done  -------------- ' )
 
 pp    ( ' ' ) 
 pp    ( '--------- constants and globals defined ... ---------- ' )
+pp    ( ' ' ) 
+
+def f_inspect_conn( s_objname, o_obj ):
+  """ inspect the properties of a connection """ 
+
+  exclude_list = [ 'handle' ] 
+
+  pp ( "-------- Object :", s_objname, "--------" )
+
+  pp ( "o_obj -[", o_obj, "]-" )
+  pp ( "o_obj type  : ",  type (o_obj ) )
+
+  if o_obj != None:
+    if hasattr ( o_obj, 'len' ):
+      obj_len = len ( o_obj )
+    else:
+      obj_len = 0
+
+    pp ( "o_obj length: ",  obj_len )
+    pp ( "o_ob j dir   : ",  dir (o_obj ) )
+    pp ( " " )
+    # hit_enter = input ( f_prfx() + "meta data from " + s_objname + "...., hit enter.." )
+
+    pp ( ' ' )
+    for dir_item  in dir(o_obj):
+      the_dir_item   = dir_item
+      the_type       = type ( dir_item )
+
+      if the_dir_item in exclude_list:
+        the_value = 'item excluded' 
+      else:
+        try:
+          the_value      = getattr(o_obj,dir_item)
+        except AttributeError:
+          the_value = 'getattr failed'
+
+      the_value_type = type(the_value) 
+
+      # if ( the_value_type == '<class \'method\'>'):
+      if ( inspect.ismethod ( the_value_type ) ):
+        the_value = ' -method- '  
+
+      the_value = str( the_value )[:50]   # limit to 50chars
+
+      # pp ( ' dir-item-name  : ', the_type, ':', dir_item ) 
+      pp ( ' dir-item-value :', f'{dir_item:>20}', ' = ', the_value_type, ' -[', the_value, ']-' )
+
+    pp ( ' ' )
+    pp ( "--- repr --->" )
+    pp ( "o_obj repr  : ",  repr ( o_obj ) )
+    pp ( "<--- repr ---  " )
+
+  # only if obj is not empty
+
+  pp ( " ------ inspected connection ", s_objname, " ---------- " )
+  hit_enter = input ( f_prfx() + "about to go back...., hit enter.." )
+
+# end of f_inspect_conn, show properties of an object
 
 
 # ---- chop off semicolon ---- 
@@ -108,24 +154,24 @@ def output_type_handler(cursor, metadata):
 
 # ------ start of main ---------- 
 
+
 pp    ( ' ' ) 
 pp    ( '--------- functions defined, start of main..  ---------- ' )
 pp    ( ' ' ) 
-# pp    ( ' proc_time_ns and time : ',  f"{time.process_time_ns():12,.0f}", ' time: ', time.time() )
-# pp    ( ' ' )
 
 ora_conn = ora_logon () 
   
-pp    ( '-----------------  connection opened ------------- ' )
+pp    ( ' ' )
+pp    ( "-----------------  connection opened ------------- " )
 pp    ( ' ' )
 
-ora_sess_inf2 ( ora_conn ) 
+# ora_sess_info ( ora_conn )
 
 pp    ( ' ' )
-pp    ( "-----------------  1st session info.. ------------- " )
+pp    ( "-----------------  check session-stats after connect ------------- " )
 pp    ( ' ' )
-pp    ( ' At this point, should have 3+1 RoundTrips and 1-2 centiseconds of DB time. ' )
-pp    ( ' ' )
+
+# quit ()
 
 # prepare to handle vectors -> lists 
 # sigh, do I really have to specify this... ?
@@ -154,49 +200,40 @@ else:
 
 sql_for_qry = chop_off_semicolon ( sql_for_qry ) 
 
-# pp ( ' creating cursor... ' ) 
-# cursor = ora_conn.cursor()     
-
-# cursor.arraysize = 10
-
-# pp    ( ' arraysize    : ', cursor.arraysize )
-# pp    ( ' prefetchrows : ', cursor.prefetchrows )
-
-pp ( ' creating cursor... ' ) 
-cursor = ora_conn.cursor()     
-
 pp    ( ' ' )
-pp    ( 'Rownr micro_sec     Content' )
-pp    ( '----- ------------  ----------... ' )
+pp    ( ' processing...' )
+pp    ( ' ' )
+pp    ( 'Rownr (Content)' )
+pp    ( '----- ----------... ' )
 
 start_ns = time.perf_counter_ns()
-for row in cursor.execute ( sql_for_qry ): 
-  next_ns         = time.perf_counter_ns()                  # can this be made µsec faster in 1 line ? 
-  # diff_micro_sec  =  ( next_ns - start_ns ) / 1000          # we dont need round..
-  diff_micro_sec  = round ( ( next_ns - start_ns ) / 1000 ) # we dont need round..
-  start_ns        = next_ns
-  tmr_spin ( 0.001 )      # give it fraction of sec, to show some time worked..
-  pp   ( f"{cursor.rowcount:5d}", f"{diff_micro_sec:12,.0f}"
-       , row )
 
-# pp    ( ' ' )
-# pp    ( '..', cursor.rowcount, ' rows processed.' ) 
+cursor = ora_conn.cursor()
+for row in cursor.execute ( sql_for_qry ):
+  next_ns = time.perf_counter_ns()
+  diff_ns = round ( ( next_ns - start_ns ) / 1000 ) 
+  start_ns = next_ns
+  pp   ( f"{cursor.rowcount:5d}", f"{diff_ns:8d}"
+        , row )
+
+pp    ( ' ' )
+pp    ( '..', cursor.rowcount, ' rows processed.' ) 
 pp    ( ' ' ) 
 pp    ( '.. Query was : -[', sql_for_qry, ']-' )
 pp    ( ' ' ) 
 
-ora_sess_inf2 ( ora_conn )
+pp    ( ' description: ', cursor.description[0].name )
+pp    ( ' prefetchrows: ', cursor.prefetchrows ) 
 
-# pp    ( ' ' )
-# pp    ( ' proc_time [ns]: ',  f"{time.process_time_ns():13,.0f}" )
-# pp    ( ' tmr_total  [s]: ',  f"{tmr_total():3.6f}", '\t\t, total since set-start.' )
-# pp    ( ' ' )
+ora_sess_info ( ora_conn )
 
-tmr_spin ( 2 )      # give it 2 sec, to show some time worked..
+f_inspect_obj ( 'ora_conn', ora_conn )
 
-tmr_report_time ()
+f_inspect_conn ( 'ora_conn', ora_conn )
 
-# pp    ( ' ' ) 
+f_inspect_conn ( 'cursor', cursor )
+
+pp    ( ' ' ) 
 pp    ( '---- end of do_sql.py ---- ' )
 pp    ( ' ' ) 
 

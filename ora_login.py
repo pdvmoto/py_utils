@@ -8,11 +8,10 @@
 # 
 # todo: 
 # - later: allow un/pwd@host:port\sid to be passed, but prefer dotenv 
+# - help text in case dot-env file is not found !!!
 # - how many other self-made includes should I depend on ?
-
 # - logon + sess_info: avoid errors on v$database, and include V$Version instead
 # - aas : dflt pause on (SQL)error, use cursor.parse to test..
-# - how many other self-made includes should I depend on ? 
 # - include ora_aas: find aas and allow throttling/sleep.
 #   if no aas-found, no conn, simply pause bcse no useful work possible
 # 
@@ -32,7 +31,7 @@ from      dotenv   import load_dotenv
 #
 # ora_logon       : use dotenv to get credentials and logon
 # ora_sess_info   : get some session stats (since logon of sess..)
-# ora_sess_inf2   : advanced version
+# ora_sess_inf2   : advanced version, show diff since last call
 #
 # ora_aas_chk     : set env and check system-load, pause if needed. 
 
@@ -40,13 +39,56 @@ from      dotenv   import load_dotenv
 #   define functions to have any arguments, 
 #
 
+
+# -- -- -- Constants, notably SQL -- -- -- 
+
+# to get statistics from DB, adjust per demo..
+
+sql_stats2 = """
+  select sn.name, st.value
+  -- , st.*
+  from v$mystat st
+  , v$statname sn
+  where st.statistic# = sn.statistic# 
+  and (  sn.name like '%roundtrips%client%'
+      -- or sn.name like 'bytes sent%client'
+      -- or sn.name like 'bytes rece%client'
+         or sn.name like '%execute count%'
+         or sn.name like 'user calls'
+      -- or sn.name like 'user commits'
+      -- or sn.name like 'user rollbacks'
+      -- or sn.name like 'consistent gets'
+      -- or sn.name like 'db block gets'
+      -- or sn.name like 'opened cursors current'
+      -- or sn.name like 'opened cursors curr%'
+      -- or sn.name like '%sorts%'
+      -- or sn.name like '%physical reads'
+         or sn.name like '%arse count (hard%'
+         or sn.name like 'DB time'
+      )
+  UNION ALL
+    select ' ~ ', 0 from dual where 1=1
+  UNION ALL
+    select ' ' || stm.stat_name || ' (micro-sec)'
+         , stm.value
+    from v$sess_time_model  stm
+    where  1=1
+      and stm.sid =  sys_context('userenv', 'sid')
+      and (     stm.stat_name like 'DB time'
+             or stm.stat_name like 'DB CPU'
+          -- or stm.stat_name like 'sql execu%'
+          -- or stm.stat_name like 'PL/SQL execu%'
+          )
+    order by 1
+"""
+
 def ora_logon ( *args ):
 
   # customize this sql to show connetion info on logon
   # note: re-worked to avoid ORA-00942 or priv-errors
   sql_show_conn="""
     select 2 as ordr
-       , 'version : ' ||  substr ( banner_full, -11) as txt
+       , 'version : ' ||  substr ( banner_full, -12) as txt
     from v$version
   UNION ALL
     select 1
@@ -113,12 +155,12 @@ def ora_logon ( *args ):
   # adjust array and prefetch if found via Dot-Env..
   if (ora_arraysize is not  None ):
     oracledb.defaults.arraysize    = int ( ora_arraysize )
-    print ( '\n ora_login: modified dflt Arraysize = ', ora_arraysize )
+    print ( ' ora_login: modified Arraysize    = ', ora_arraysize )
   if ( ora_prefetchrows is not None ):
     oracledb.defaults.prefetchrows    = int ( ora_prefetchrows ) 
-    print ( '\n ora_login: modified dflt Prefetchrows = ', ora_prefetchrows )
+    print ( ' ora_login: modified Prefetchrows = ', ora_prefetchrows )
 
-  print   ( '\n  ora_login: ' ) 
+  print   ( ' ora_login ' ) 
 
   return ora_conn  # ------- logon and return conn object --- 
 
@@ -208,19 +250,19 @@ def ora_sess_inf2 ( the_conn ):
   sess_info_next = {}             # local, recent data.
 
   # make this sql external, save space, and share with others
-  sql_stats2 = """
+  sql_stats3 = """
     select sn.name, st.value
     -- , st.*
     from v$mystat st
     , v$statname sn
     where st.statistic# = sn.statistic# 
     and (  sn.name like '%roundtrips%client%'
-           or sn.name like 'bytes sent%client'
-           or sn.name like 'bytes rece%client'
+        -- or sn.name like 'bytes sent%client'
+        -- or sn.name like 'bytes rece%client'
            or sn.name like '%execute count%'
            or sn.name like 'user calls'
-        --or sn.name like 'user commits'
-        --or sn.name like 'user rollbacks'
+        -- or sn.name like 'user commits'
+        -- or sn.name like 'user rollbacks'
         -- or sn.name like 'consistent gets'
         -- or sn.name like 'db block gets'
         -- or sn.name like 'opened cursors current'
@@ -230,7 +272,20 @@ def ora_sess_inf2 ( the_conn ):
         or sn.name like '%arse count (hard%'
         or sn.name like 'DB time'
         )
-      order by sn.name 
+    UNION ALL
+      select ' ~ ', 0 from dual where 1=1
+    UNION ALL
+      select ' ' || stm.stat_name || ' (micro-sec)'
+           , stm.value
+      from v$sess_time_model  stm
+      where  1=1
+        and stm.sid =  sys_context('userenv', 'sid')
+        and (     stm.stat_name like 'DB time'
+               or stm.stat_name like 'DB CPU'
+            -- or stm.stat_name like 'sql execu%'
+            -- or stm.stat_name like 'PL/SQL execu%'
+            )
+      order by 1
     """
 
   print ( ' ora_sess_inf2:   -- -- Session Stats -- -- ')
@@ -241,21 +296,27 @@ def ora_sess_inf2 ( the_conn ):
   cur_stats.prefetchrows = 30      # set array to limit round trips
   for row in cur_stats.execute ( sql_stats2 ):
 
-    print   ( ' ora_sess_info: ', f"{row[1]:10.0f}  {row[0]}"   )
+    # print   ( ' ora_sess_inf2: ', f"{row[1]:10.0f}  {row[0]}"   )
     # add to dict..for next  time
     sess_info_now [ row[0] ] = row[1]
 
   # debug stuff.
-  print ( ' ora_sess_inf2; ', len ( sess_info_now ), ' new items' ) 
-  print ( ' ora_sess_inf2; ', len ( g_sess_info_dict ), ' existing items' ) 
+  # print ( ' ora_sess_inf2; ', len ( sess_info_now ), ' new items' ) 
+  # print ( ' ora_sess_inf2; ', len ( g_sess_info_dict ), ' existing items' ) 
   
   # if prev version exists: show diffs
-  if ( len ( g_sess_info_dict ) > 0 ):
+  if ( len ( g_sess_info_dict ) > 0 ):      # display diffs
 
     for stat_key in g_sess_info_dict: 
       diff = sess_info_now [ stat_key ] - g_sess_info_dict [ stat_key ] 
-      print ( ' ora_inf2: ', stat_key, ' : ', diff )  
+      # print ( ' ora_sess_inf2: ', stat_key, ' : ', diff )  
+      print   ( ' ora_sess_inf2: ', f"{diff:10.0f}  {stat_key}"   )
  
+  else:                                     # initial call.. display now-values 
+
+    for stat_key in sess_info_now: 
+      print   ( ' ora_sess_inf2: ', f"{ sess_info_now [ stat_key ]:10.0f}  {stat_key}"   )
+
   # keep dict for next call
   g_sess_info_dict = dict ( sess_info_now )
 

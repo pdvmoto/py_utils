@@ -77,8 +77,11 @@ def tmr_report_time ():
   # print ( ' duration:  proctim   : ', ( time.process_time()    - g_durat_proctim    ), 'sec..' ) 
   # print ( ' duration:  proctim_ns: ', ( time.process_time_ns() - g_durat_proctim_ns ), 'ns..' ) 
 
-  n_real_sec = round ( ( time.time()         - g_durat_start    ), 3 )
-  n_user_sec = round ( ( time.process_time() - g_durat_proctim  ), 3 )
+  # n_real_sec = round ( ( time.time()         - g_durat_start    ), 3 )
+  # n_user_sec = round ( ( time.process_time() - g_durat_proctim  ), 3 )
+  # the NS counters seemed closer to sys-time
+  n_real_sec = round ( ( time.perf_counter_ns() - g_durat_prfcnt_ns  ) / ( 1000 * 1000 * 1000), 3 )
+  n_user_sec = round ( ( time.process_time_ns() - g_durat_proctim_ns ) / ( 1000 * 1000 * 1000), 3 )
   n_idle_sec = round ( n_real_sec - n_user_sec, 3 )
 
   # linux style output
