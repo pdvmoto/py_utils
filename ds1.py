@@ -43,7 +43,7 @@ import    os
 import    sys
 import    array
 
-import    inspect 
+#import    inspect 
 import    time
 from      datetime      import datetime
 # from      dotenv        import load_dotenv
@@ -110,8 +110,8 @@ def f_inspect_conn( s_objname, o_obj ):
       the_value_type = type(the_value) 
 
       # if ( the_value_type == '<class \'method\'>'):
-      if ( inspect.ismethod ( the_value_type ) ):
-        the_value = ' -method- '  
+      # if ( inspect.ismethod ( the_value_type ) ):
+      #   the_value = ' -method- '  
 
       the_value = str( the_value )[:50]   # limit to 50chars
 

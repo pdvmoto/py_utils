@@ -10,7 +10,7 @@ g_durat_prfcnt_ns = time.perf_counter_ns ()
 g_durat_proctim   = time.process_time ()
 g_durat_proctim_ns = time.process_time ()
   
-
+#
 # duration.py: measure duration of programs or tasks.
 # 
 # usage: 

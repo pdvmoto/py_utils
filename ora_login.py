@@ -45,7 +45,7 @@ from      dotenv   import load_dotenv
 # to get statistics from DB, adjust per demo..
 
 sql_stats2 = """
-  select sn.name, st.value
+  select /* s2 stats */ sn.name, st.value
   -- , st.*
   from v$mystat st
   , v$statname sn
@@ -99,11 +99,12 @@ def ora_logon ( *args ):
        , 'prompt  : ' || user
          || ' @ '  || global_name           -- ||db.name
          -- || ' @ ' || REGEXP_SUBSTR(banner_full, 'version [^ ]+', 1, 1, 'i') 
-         || ' @ '|| SYS_CONTEXT('USERENV','SERVER_HOST')
+         -- || ' @ '|| SYS_CONTEXT('USERENV','SERVER_HOST')
          || decode  (SYS_CONTEXT('USERENV','SERVER_HOST')
               , '98b6d46dd637',    ' (xe-dev)'
               , '98eac28a59c0',    ' (dckr-23c)'
-              , '2c4a51017a44',    ' (dckr-23ai)'
+              , '2c4a51017a44',       ' (dckr-23ai)'
+              , 'oracle-19c-vagrant', ' (test19c)'
               , ' (-envname-)')
          || ' > '
     FROM   global_name  -- v$version      ver
