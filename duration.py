@@ -1,6 +1,6 @@
 
+# do the import as early as possible..?
 import time
-from datetime import datetime 
 
 # try out some time-keepers.. 
 # assign these as early as possible
@@ -8,8 +8,11 @@ g_durat_start     = time.time ()
 g_durat_prfcnt    = time.perf_counter ()
 g_durat_prfcnt_ns = time.perf_counter_ns ()
 g_durat_proctim   = time.process_time ()
-g_durat_proctim_ns = time.process_time ()
+g_durat_proctim_ns = time.process_time_ns ()
   
+# can we replace datetime by just time?
+from datetime import datetime 
+
 #
 # duration.py: measure duration of programs or tasks.
 # 
@@ -150,10 +153,16 @@ if __name__ == '__main__':
   # print ( ' - ' )
   # print ( 'pf_set : ', pf_set() ) 
 
-  print ( '\n --- testing timekeepeers, real/usr/sys..  --- ' ) 
+  print ( '\n --- testing timekeepeers, real/usr/sys..  --- \n' ) 
 
+  print ( 'time.time          at start :', g_durat_start,       ', now:', time.time()             )
+  print ( 'time.perf_counter  at start :', g_durat_prfcnt,      ', now:', time.perf_counter()     )
+  print ( 'time.perf_counter_ns        :', g_durat_prfcnt_ns,   ', now:', time.perf_counter_ns()  ) 
+  print ( 'time.process_time  at start :', g_durat_proctim,     ', now:', time.process_time()     )
+  print ( 'time.process_time_ns        :', g_durat_proctim_ns,  ', now:', time.process_time_ns()  )
+    
   # try out some time-keepers..
-  print ( ' --- --- raw data from timers.. --- --- ' )
+  print('\n --- --- delta data from timers.. --- --- ' )
   print ( ' --- elapsed   : ', ( time.time()            - g_durat_start       ), 'sec..' ) 
   print ( ' --- percntr   : ', ( time.perf_counter()    - g_durat_prfcnt      ), 'sec..' ) 
   print ( ' --- percntr_ns: ', ( time.perf_counter_ns() - g_durat_prfcnt_ns  ), 'ns..' ) 
@@ -167,5 +176,5 @@ if __name__ == '__main__':
 
   print ( '\n' )  
   tmr_report_time ()
-  print ( '\n' )  
+  print ( '' )  
 

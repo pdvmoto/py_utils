@@ -194,6 +194,8 @@ ora_sess_inf2 ( ora_conn )
 
 tmr_spin ( 2 )      # give it 2 sec, to show some time worked..
 
+ora_sess_info ( ora_conn ) 
+
 tmr_report_time ()
 
 # pp    ( ' ' ) 

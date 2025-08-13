@@ -6,7 +6,24 @@
 #   grant select on v_$mystat, v_$version, v_$statname, v_$sess_time_model to ... 
 #   grant select on v_$sysstat, v_$parameter to ... 
 # 
+# functions included
+#
+#   ora_logon ( *args ) 
+#   ora_sess_info ( the_conn ) - reports on "totals" from v$mystat and v$sess_time_model
+#   ora_sess_inf2 ( the_conn ) - idem, but difference since previous call
+#
+#   ora_aas_chk ( the_conn )    - check how busy RDBMS is, pause-sleep if necessary
+#
+#   ora_rt_1ping ( the_conn )  - do 1 ping over the connection, report back ms (milliseconds)
+#   f_time_spent ( the_conn )  - report time spent by program: python + RDBMS + Network..
+#
+#
+# Dependencies:
+#   duration.py
+#   prefix.py
+#
 # todo: 
+# - timing,.. should we load duration.py at the very top ? => test!
 # - later: allow un/pwd@host:port\sid to be passed, but prefer dotenv 
 # - help text in case dot-env file is not found !!!
 # - how many other self-made includes should I depend on ?
@@ -25,6 +42,11 @@ import    os
 import    time
 import    oracledb
 from      dotenv   import load_dotenv
+
+# we use those..., 
+
+from prefix     import *
+from duration   import *
 
 #
 # functions in this file:
@@ -67,7 +89,7 @@ sql_stats2 = """
          or sn.name like 'DB time'
       )
   UNION ALL
-    select ' ~ ', 0 from dual where 1=1
+    select ' ~ ', 0 from dual where 1=0
   UNION ALL
     select ' ' || stm.stat_name || ' (micro-sec)'
          , stm.value
@@ -75,7 +97,7 @@ sql_stats2 = """
     where  1=1
       and stm.sid =  sys_context('userenv', 'sid')
       and (     stm.stat_name like 'DB time'
-             or stm.stat_name like 'DB CPU'
+          -- or stm.stat_name like 'DB CPU'
           -- or stm.stat_name like 'sql execu%'
           -- or stm.stat_name like 'PL/SQL execu%'
           )
@@ -224,7 +246,7 @@ def ora_sess_info ( the_conn ):
   # but only when needed: it is 1 extra RT
   # cur_stats.parse ( sql_stats )  
 
-  for row in cur_stats.execute ( sql_stats ):
+  for row in cur_stats.execute ( sql_stats2 ):
     # print ( ' stats : ', row[1], ' ', row[0] )
     print   ( ' ora_sess_info: ', f"{row[1]:8.0f}  {row[0]}"   )
 
@@ -435,6 +457,102 @@ def ora_aas_chk ( conn_obj ):
 
   return duration_ms  # -- end of function ora_aas_chk, return duration
 
+# 
+# ping function to sample RTT, return milliseconds (float)
+def ora_rt_1ping ( ora_conn ):
+
+  n_start = time.perf_counter_ns()        # use nano for precision?
+  ora_conn.ping()
+  n_ms_ping = ( time.perf_counter_ns() - n_start ) / (1000 * 1000 )
+
+  return n_ms_ping  # -- measure 1 ping.. in ms
+
+# -- -- -- ora_rt_1ping defined -- -- --
+
+
+pp (' ------ define constants for f_time_spent (move this code? ) ------ ')
+pp ()
+
+# the sql can be defined outside...
+# get DB-time (cc and microsec), and RTs...
+sql_timers="""
+  select st_rt.value     as nr_rts 
+  ,      st_cs.value     as db_time_cs
+  ,      st_tm.value  as db_time_micro
+  from v$mystat   st_rt
+     , v$mystat   st_cs
+     ,  v$sess_time_model st_tm
+  where 1=1
+  and st_rt.statistic#   = ( select statistic# from v$statname where name like '%roundtrips%client%' )
+  and st_cs.statistic#   = ( select statistic# from v$statname where name like 'DB time' )
+  and st_tm.sid       =  sys_context('userenv', 'sid')
+  and st_tm.stat_name = 'DB time'
+"""
+# note: 3 return values, integers, can use row[0], row[1], row[2]..
+
+
+# -- -- -- a function to try and report Where Time Was Spent... -- -- --
+
+def f_time_spent ( ora_conn ):
+
+  pp ()
+  pp ('Now try to collect all data: nr-RTs, ping-time, process-time and elapsed time..' )
+
+  # sample the ping-time..  try loop-call of n pings..
+  total_ms  = 0.0
+  ping_ms   = 0.0
+  sleep_s   = 0.0
+  n_counter = 10
+  for n_loop in range (1,n_counter+1):
+    ping_ms     = ora_rt_1ping ( ora_conn )
+    total_ms   += ping_ms
+    # optional sleep-time, similar to -i<sec>..
+    pp ('pinged: seq=', n_loop, ' RTT=', ping_ms )
+    time.sleep( sleep_s )                             # should be configurable, -i<n>
+
+  avg_ping_ms = total_ms / n_counter
+
+  pp ()
+  pp ( 'RTT - avg of pings : ', round ( avg_ping_ms, 3) , 'ms (over ', n_counter, 'pings)' )
+
+  # now get DB-time (cc and microsec), and RTs...
+
+  cur_timers = ora_conn.cursor () 
+  for row in cur_timers.execute ( sql_timers ):
+    n_rts           = row[0]
+    db_time_cs      = row[1]
+    db_time_micro   = row[2]
+    pp ( 'DB - statistics: nrRTs=', n_rts, ' DB_time_cs=', db_time_cs, 'DB_time_micro=', db_time_micro )
+
+  # the process and elapsed time in pythyon:
+  # note: put this code as late as possible..
+  # note: can eliminate some lines, but keep them for clarity
+  nano_to_sec    = int ( 1000 * 1000 * 1000 )
+  app_process_ns = time.process_time_ns ()                      # this seems to start at 0
+  ela_time_ns    = time.perf_counter_ns() - g_durat_proctim_ns  # perf_counter =~ epoch ? 
+
+  # wrap it up: network time, total time..
+
+  app_process_s = round ( app_process_ns / nano_to_sec   , 6) 
+  db_time_s     = round ( db_time_micro / (1000*1000)    , 6) 
+  netw_time_s   = round ( n_rts * avg_ping_ms / 1000     , 6)
+  total_time_s  = round ( ela_time_ns / nano_to_sec      , 6)
+
+  idle_time_s  = round ( (ela_time_ns / nano_to_sec) 
+                        - app_process_s
+                        - db_time_s
+                        - netw_time_s                    , 6 )
+  pp ( ' ' )
+  pp ( ' App_process (busy) :', app_process_s, 'sec,  = user + sys' )
+  pp ( ' DB time            :', db_time_s    , 'sec, via sess_time_model' )  
+  pp ( ' Network time       :', netw_time_s  , 'sec, via nrRTs x pingtime-sampled' )  
+  pp ( ' Idle (wait-time?)  :', idle_time_s  , 'sec (as leftover)' )
+  pp ( '---------------------  ----------' )
+  pp ( 'Total time          :', total_time_s , 'sec (from time.perf_counter_ns)' )
+
+
+  return 0    # -- -- -- end f_time_spent () -- -- -- 
+              # what would be a good return-value  ?
 
 # ---- some  test code below... ---- 
 
@@ -483,22 +601,29 @@ if __name__ == '__main__':
 
   print ()
   print ( ' ---- ora_logon: check the stats, for current sesion ---- ' ) 
-  print ()
 
   ora_sess_info ( ora_conn )
 
   print ()
   print ( ' ---- ora_logon: re-check the stats, measure overhead of sess_info ---- ' ) 
-  print ()
 
   ora_sess_info ( ora_conn )
 
   print ()
   print ( ' ---- ora_logon: test the DICT-version of seession_info ---- ' ) 
-  print ()
 
   ora_sess_inf2 ( ora_conn )
+  print ()
+  print ( ' single ping: ', ora_rt_1ping ( ora_conn ), 'ms' ) 
+  print ()
   ora_sess_inf2 ( ora_conn )
+
+  print ()
+  print ( ' ---- final check: report time-spent ' )
+
+  f_time_spent ( ora_conn ) 
+
+  tmr_report_time()
 
   print ()
   print ( ' ---- ora_sess_info: tested with current session ---- ' ) 
