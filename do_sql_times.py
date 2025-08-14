@@ -1,13 +1,21 @@
-# as early as possible..
+#
+# import duration as early as possible, to set start-timers.
 
 from      duration      import *
 
 #
-# do_sql_times.py : enter a query and run it, print results
+# do_sql_times.py : enter a query, or use $1, and run it. 
+#                   this version prints results and timing data
 #
 # background:
 #   clone of do_sql.py: run a g neric query.. 
 #   This verions is altered to "Measure" timings, and v$mystats.
+#
+# depends on:
+#   duration.py
+#   prefix.py
+#   ora_login.py
+#   dotenv utility, and the file .env
 #
 # Stern Warning: 
 #   This tool uses "dynamic SQL", 
@@ -20,11 +28,6 @@ from      duration      import *
 # - any DDL will Succeed! => big risk.
 #
 # todo: specific for timer-version
-#   - add perf_counter and process_time.
-#   - add microsec at each line
-#   - consider process-time at each line
-#   - proc-time into duration as separate measure.
-#   - python on mac stops at MicroSec, no need to display Nano..
 #   - ...
 #
 # todo (from generic do_sql.py) :
@@ -55,10 +58,6 @@ import    os
 import    sys
 import    array
 
-#import    time
-from      datetime      import datetime
-from      dotenv        import load_dotenv
-
 import    oracledb 
 
 print ( '--------- generic imports done  -------------- ' )
@@ -66,16 +65,9 @@ print ( ' ' )
 
 from      prefix        import *
 from      ora_login     import *
-#from     duration      import *
-
-# from    inspect_obj   import *
 
 pp    ( ' ' )
 pp    ( '--------- local utilities imports done  -------------- ' )
-
-# pp    ( ' proc_time_ns : ',  f"{time.process_time_ns():12,.0f}" )
-# pp    ( ' tmr_start    : ', tmr_start(), '\t\t, set the start-time.' )
-# pp    ( ' ' )
 
 #
 # any constants or global (module-wide) definitions go here...
@@ -109,39 +101,25 @@ def output_type_handler(cursor, metadata):
 # ------ start of main ---------- 
 
 pp    ( ' ' ) 
-pp    ( '--------- functions defined, start of main..  ---------- ' )
+pp    ( '--------- functions defined, start of MAIN..  ---------- ' )
 pp    ( ' ' ) 
-# pp    ( ' proc_time_ns and time : ',  f"{time.process_time_ns():12,.0f}", ' time: ', time.time() )
-# pp    ( ' ' )
 
 ora_conn = ora_logon () 
   
 pp    ( '-----------------  connection opened ------------- ' )
-pp    ( ' ' )
 
-ora_sess_inf2 ( ora_conn ) 
-
-pp    ( ' ' )
-pp    ( "-----------------  1st session info.. ------------- " )
-pp    ( ' ' )
-pp    ( ' At this point, should have 3+1 RoundTrips and 1-2 centiseconds of DB time. ' )
-pp    ( ' ' )
+# ora_sess_inf2 ( ora_conn ) 
+# pp    ( ' ' )
+# pp    ( "-----------------  1st session info.. ------------- " )
+# pp    ( ' ' )
+# pp    ( ' At this point, should have 3+1 RoundTrips and 1-2 centiseconds of DB time. ' )
+# pp    ( ' ' )
 
 # prepare to handle vectors -> lists 
 # sigh, do I really have to specify this... ?
 ora_conn.outputtypehandler = output_type_handler
 
-
 # --- check arguments ----- 
-
-n = len(sys.argv)
-
-# Arguments passed
-# pp ("Name of Python script:", sys.argv[0])
-# pp ("Total arguments passed:", n)
-# pp ("Arguments passed:")
-# for i in range(1, n):
-#   pp ('..arg ' , i, ': [', sys.argv[i], ']')
 
 # now start sql and real work
 
@@ -155,14 +133,6 @@ else:
 sql_for_qry = chop_off_semicolon ( sql_for_qry ) 
 
 # pp ( ' creating cursor... ' ) 
-# cursor = ora_conn.cursor()     
-
-# cursor.arraysize = 10
-
-# pp    ( ' arraysize    : ', cursor.arraysize )
-# pp    ( ' prefetchrows : ', cursor.prefetchrows )
-
-pp ( ' creating cursor... ' ) 
 cursor = ora_conn.cursor()     
 
 pp    ( ' ' )
@@ -171,21 +141,18 @@ pp    ( '----- ------------  ----------... ' )
 
 start_ns = time.perf_counter_ns()
 for row in cursor.execute ( sql_for_qry ): 
-  next_ns         = time.perf_counter_ns()                  # can this be made µsec faster in 1 line ? 
-  # diff_micro_sec  =  ( next_ns - start_ns ) / 1000          # we dont need round..
+  next_ns         = time.perf_counter_ns()      # can this be made µsec faster in 1 line ? 
+  # diff_micro_sec  =  ( next_ns - start_ns ) / 1000        # we dont need round..
   diff_micro_sec  = round ( ( next_ns - start_ns ) / 1000 ) # we dont need round..
   start_ns        = next_ns
-  tmr_spin ( 0.001 )      # give it fraction of sec, to show some time worked..
   pp   ( f"{cursor.rowcount:5d}", f"{diff_micro_sec:12,.0f}"
        , row )
 
-# pp    ( ' ' )
-# pp    ( '..', cursor.rowcount, ' rows processed.' ) 
 pp    ( ' ' ) 
 pp    ( '.. Query was : -[', sql_for_qry, ']-' )
 pp    ( ' ' ) 
 
-ora_sess_inf2 ( ora_conn )
+# ora_sess_inf2 ( ora_conn )
 
 # pp    ( ' ' )
 # pp    ( ' proc_time [ns]: ',  f"{time.process_time_ns():13,.0f}" )
@@ -196,9 +163,9 @@ tmr_spin ( 2 )      # give it 2 sec, to show some time worked..
 
 ora_sess_info ( ora_conn ) 
 
-tmr_report_time ()
+ora_time_spent ( ora_conn ) 
 
-# pp    ( ' ' ) 
-pp    ( '---- end of do_sql.py ---- ' )
+pp    ( ' ' ) 
+pp    ( '---- end of do_sql_times.py ---- ' )
 pp    ( ' ' ) 
 
