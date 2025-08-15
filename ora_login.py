@@ -159,24 +159,24 @@ def ora_logon ( *args ):
     , service_name  = ora_sid
   )
 
-  print    ( ' ora_login: --- Connection is: --->' )
+  print    ( ' ora_login: ----- Connection is: --->' )
   
   cursor = ora_conn.cursor()
   cursor.prefetchrows = 10      # set prefetch to limit round trips
   for row in cursor.execute ( sql_show_conn ):
-    print  ( ' ora_login:', row[1] )
+    print  ( ' ora_login:   ', row[1] )
 
-  print    ( ' ora_login:  <-- Connection  ---- ' )
+  print    ( ' ora_login: <---- Connection  ---- ' )
 
   # adjust array and prefetch if found via Dot-Env..
 
   if (ora_arraysize is not  None ):
     oracledb.defaults.arraysize    = int ( ora_arraysize )
-    print ( ' ora_login: modified Arraysize    = ', ora_arraysize )
+    print ( ' ora_login: Modified Arraysize    = ', ora_arraysize )
 
   if ( ora_prefetchrows is not None ):
     oracledb.defaults.prefetchrows    = int ( ora_prefetchrows ) 
-    print ( ' ora_login: modified Prefetchrows = ', ora_prefetchrows )
+    print ( ' ora_login: Modified Prefetchrows = ', ora_prefetchrows )
 
   print   ( ' ora_login: ' ) 
 
