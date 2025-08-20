@@ -2,7 +2,7 @@
 #  
 # requirements: (from blog 16aug?)
 #   a ping, report nrRTTs, min/avg/max/stddev.
-#   run infinite when main, run max 100 when in other program.
+#   prefer: run infinite when main, run max 100 when in other program.
 #   print results and connect-info at bottom ???
 #   allow for optional arguments  -i<sec>, allow for -c<count>
 #   later: allow for connect-strings ? 
