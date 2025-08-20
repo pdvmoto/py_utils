@@ -78,8 +78,7 @@ def f_run_pings ( ora_conn, sleep_s=0.0, n_max_pings=0 ):
 
       time.sleep( ping_delay_s )   # somehow, we need a delay ? 
 
-      #print ( 'tst_netw: ', service_name, ' seq=', n_counter, ' time=', round ( n_pingtime_ns / (1000 * 1000 ), 3), 'ms' )
-      pp     ( 'tst_netw: ', service_name, ' seq=', n_counter, ' time=', round ( n_pingtime_ns / (1000 * 1000 ), 3), 'ms' )
+      pp     ( 'service=', service_name, ' seq=', n_counter, ' time=', round ( n_pingtime_ns / (1000 * 1000 ), 3), 'ms' )
 
     except KeyboardInterrupt:
       #pp ( '\ntst_netw: --- Interrupted, db-ping statisticss:ing ---' ) 
@@ -121,9 +120,9 @@ def f_run_pings ( ora_conn, sleep_s=0.0, n_max_pings=0 ):
   pp ('-- from', n_counter, 'pings with delay', ping_delay_s, 'sec')
   pp ('-- dsn =', dsn_descr ) 
 
-  pp ( '\n verify avg:', n_avg_ms ) # verified, it was correct..
-
-  # try catch  errors here... ? 
+  #pp ( '\n verify avg:', n_avg_ms ) # verified, it was correct..
+ 
+  # try catch  errors here... ?
   if ora_conn.is_healthy (): 
     # pp ( ' conn still healthy ' ) 
     # ora_sess_info ( ora_conn ) 
@@ -179,43 +178,19 @@ def f_rt_1ping ( ora_conn ):
 pp ( ' ----- functions etc. defined, ----- Start of MAIN ----- ' )
 pp ( )
 
+# pick SQL from commandline, if arg1: use it as delay (seconds, float).
+if len(sys.argv) == 2:
+  delay_s = float ( sys.argv[1] ) 
+else:
+  delay_s = 1.0001
+
 ora_conn = ora_logon ()
 
 pp    ( ' ----- ora_logon: done ---- ' )
 pp    ()
 
-# check for 1 ping..
-# pp ( 'single ping  : ', round ( f_rt_1ping ( ora_conn ), 3) , 'ms' )
-# pp ( ' ' )
-
-# try loop-call of 100 pings..
-# n_total = 0.0
-# n_counter = 25
-# for n_loop in range (1,n_counter):
-#   n_total += f_rt_1ping ( ora_conn ) 
-
-# n_avg = n_total / n_counter
-# pp ( 'avg of pings : ', round ( n_avg, 3) , ' (over ', n_counter, 'pings)' )
-
-# done this: overhead is in the microseconds, 
-# feel free to repeat the calibration on new machines
-# e.g. 1/1000 fraction of the ping time.
-# n_sec = 2
-# f_rt_calibrate ( ora_conn, n_sec )
-# pp    ( ' ----- pings and calibrate done ----- ' )
-
-# ora_sess_info ( ora_conn ) 
-
-# in case you want a finite number 
-# delay_s = 0.001
-# n_pings = 100
-# avg_ms  = f_run_pings ( ora_conn, delay_s, n_pings ) 
-# pp    ()
-# pp    ( ' ping result, avg =', avg_ms ) 
-
-delay_s = 1.0001
-n_pings = 100
-avg_ms = f_run_pings ( ora_conn, delay_s, 0  ) 
+n_pings = 0   # 0 = endless
+avg_ms = f_run_pings ( ora_conn, delay_s, n_pings  ) 
 
 pp    ()
 pp    ( ' ping result, avg =', avg_ms ) 
