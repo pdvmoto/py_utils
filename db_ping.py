@@ -29,7 +29,7 @@ print ( ' ---- db_ping.py first do imports ..--- ' )
 
 import    time
 import    string
-from      datetime  import  datetime
+# from      datetime  import  datetime
 
 # local utilities, keep/cp in same directory for now...
 # from  duration      import *
@@ -47,7 +47,7 @@ pp    ()
 def f_run_pings ( ora_conn, sleep_s=0.0, n_max_pings=0 ):
 
   # got errors with 0.0 ??  hence put in 1 microsec
-  min_sleep_s = 0.0001
+  min_sleep_s = 0.000001
 
   n_total_ns = 0
   n_counter  = 0

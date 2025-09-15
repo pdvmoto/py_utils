@@ -1,0 +1,37 @@
+
+notes on timings..
+
+ - measure DB time, both v$stat and v$time_model.
+ - measure python time via perfcounter_ns
+ - measure ping: ping-time minus empty-loop-time.. => RT Time (any db time involved?)
+ - measure commit-time : just do 1000 ins-commit and 1000 del-commits.. ?  repeat without commit..
+ - measure db-time from spinf_n ( 10.0 )  ? 
+ - measure pyytong tiome from 10sec spin.. ? 
+
+
+RT sampling:
+ - 1000 ping, measure time, calc avg (subtract empty-loop-time ? )
+ - 1000 records from dual with prefetch 0 and array=1 : 100 RTs
+
+Bundle all in a few functions: benchmark-python-oracle..:
+  - report RT time (from python-db-ping)
+  - report Commit-time.
+
+use table : tst_py_42 ( id number )  : 
+light weight table, ins-1000 and del-1000 with + without commit.
+
+
+todo: 
+ - log sql_history and report heavy stmnts..,
+ - compare to ASH ? 
+
+
+sql_history:_h
+ - create table xx_sql_hst : mk_sql_hist.sql
+ - create function to store session-data in tbl : mk_sql_hist.sql
+ - call the function to store data ( from sql or from python)
+ - output readable data from python : ora_login.py :  ora_sess_report()
+    needs if-smnt for presence of the function ? 
+ - later: exclude the internal SQL, to keep cleaner data ?
+ - compare to AWR ? 
+

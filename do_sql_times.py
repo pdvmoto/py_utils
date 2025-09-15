@@ -159,7 +159,7 @@ pp    ( ' ' )
 # pp    ( ' tmr_total  [s]: ',  f"{tmr_total():3.6f}", '\t\t, total since set-start.' )
 # pp    ( ' ' )
 
-tmr_spin ( 2 )      # give it 2 sec, to show some time worked..
+# tmr_spin ( 2 )      # give it 2 sec, to show some time worked..
 
 ora_sess_info ( ora_conn ) 
 
