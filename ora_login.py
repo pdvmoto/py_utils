@@ -14,6 +14,7 @@
 #   ora_logon ( *args )        - Actually picks up credentials from dotenv : .env
 #   ora_sess_info ( the_conn ) - reports on "totals" from v$mystat and v$sess_time_model
 #   ora_sess_inf2 ( the_conn ) - idem, but difference since previous call
+#   ora_sess_hist ( the_conn ) - stmnts from v$sql_history (if available...)
 #
 #   ora_aas_chk ( the_conn )   - check how busy RDBMS is, do pause-sleep if necessary
 #
@@ -101,7 +102,7 @@ def ora_logon ( *args ):
   # customize this sql to show connetion info on logon
   # note: re-worked to avoid ORA-00942 or priv-errors
   sql_show_conn="""
-    select 2 as ordr
+    select /* get conn-info */ 2 as ordr
        , 'version : ' ||  substr ( banner_full, -12) as txt
     from v$version
   UNION ALL
@@ -280,8 +281,8 @@ def ora_sess_inf2 ( the_conn ):
     sess_info_now [ row[0] ] = row[1]
 
   # debug stuff.
-  # print ( ' ora_sess_inf2; ', len ( sess_info_now ), ' new items' ) 
-  # print ( ' ora_sess_inf2; ', len ( g_sess_info_dict ), ' existing items' ) 
+  # print ( ' ora_sess_inf2: ', len ( sess_info_now ), ' new items' ) 
+  # print ( ' ora_sess_inf2: ', len ( g_sess_info_dict ), ' existing items' ) 
   
   # if prev version exists: show diffs
   if ( len ( g_sess_info_dict ) > 0 ):      # if global-(previous) data available, display diffs
@@ -300,6 +301,79 @@ def ora_sess_inf2 ( the_conn ):
 
   return 0 # -- -- -- -- ora_sess_inf2
 
+#
+# try finding SQL-history for the session
+# consider: overriding pp ( )
+#
+def ora_sess_hist ( the_conn ):
+
+  # local override..
+  def pp ( *args ):
+    print ( ' sql_hist: ', *args ) 
+    return 0
+
+  n_retval = 0
+
+  sql_hist_select="""
+    select /* vsql_hist ******  sql_id
+    --, to_char ( h.sql_exec_start, 'HH24:MI:SS' ) as start_tm
+      , h.elapsed_time ela_us
+    --, h.cpu_time cpu_us, h.buffer_gets buff_g
+      , replace ( substr ( h.sql_text, 1, 70 ), chr(10), '|' ) sql_txt
+      , h.key ***/
+     rpad ( h.sql_id, 14 )
+       ||  to_char ( count (*)               , '999999999' )
+       ||  to_char (   sum ( h.elapsed_time ), '999999999' )
+       ||  to_char (   sum ( h.cpu_time )    , '999999999' )  || ' '
+       ||  replace ( substr ( h.sql_text, 1, 50 ), chr(10), ' ' ) || '...'
+    from v$sql_history h
+    where 1=1
+      and h.sid = SYS_CONTEXT ('USERENV', 'SID')
+    group by h.sql_id, h.sql_text
+    order by  sum (h.elapsed_time)
+  """
+  # retun: mulitple columnms.. later version: return just 1 varchar, is easier
+
+  sql_has_history ="""
+    select /* check sql_hist enabled */ 
+      decode ( p.value, 'TRUE', 1, 0 ) as result
+    from v$version v
+       , v$parameter p
+    where 1=1
+    and v.banner like '%23ai%'
+    and p.name = 'sql_history_enabled'
+  """
+  # return 1 number, or no rows at all.
+
+  # pp ( )
+  # pp ( 'start of ora_sql_hist, try retrieving SQL-stmnts for this program-run' )
+
+  # check only if version is 23, and only if parameter is set..
+
+  cur_hist = the_conn.cursor ()
+  cur_hist.execute ( sql_has_history )
+  row = cur_hist.fetchone ()
+  if int( row[0] ) != 1:
+    pp ( ' ' ) 
+    pp ( 'sql_history not available, check Version == 23ai, and SQL_HISTORY_ENABLED = True' )
+    pp ( ' ' ) 
+    return 0 
+
+  # if we get here: we can look for sql_history...
+
+  pp    ( ' ' )
+  pp    ( '... SQL history, ordered by ela_us ...' )
+  pp    ( ' ' )
+  pp    ( 'row  sql_id         exe_count ela_us   cpu_us   SQL' )
+  pp    ( '---- -------------- --------- -------- -------- -------- ... ' )
+
+  cursor = the_conn.cursor()
+  for row in cursor.execute ( sql_hist_select ):
+    pp   ( f"{cursor.rowcount:4d}", row[0] )
+
+  pp ()
+
+  return cursor.rowcount 
 
 # -- --  ora_aas -- -- 
 # 
@@ -453,7 +527,7 @@ def ora_time_spent ( ora_conn ):
 
   # sample the ping-time..  try loop-call of n pings..
   n_counter = 5
-  sleep_s   = 0.0
+  sleep_s   = 1.0
   ping_ms   = 0.0
   total_ms  = 0.0
 
@@ -575,7 +649,9 @@ if __name__ == '__main__':
   ora_sess_inf2 ( ora_conn )
 
   print ()
-  print ( ' ---- final check: report time-spent ' )
+  print ( ' ---- final check: report history and time-spent ' )
+
+  ora_sess_hist ( ora_conn ) 
 
   ora_time_spent ( ora_conn ) 
 

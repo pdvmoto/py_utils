@@ -35,3 +35,7 @@ sql_history:_h
  - later: exclude the internal SQL, to keep cleaner data ?
  - compare to AWR ? 
 
+remarks: 
+ - the view sees all connected sessions, 
+ - but the data from disconnect-sessions is removed. each session needs to "save data"
+

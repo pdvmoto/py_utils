@@ -161,6 +161,8 @@ pp    ( ' ' )
 
 # tmr_spin ( 2 )      # give it 2 sec, to show some time worked..
 
+ora_sess_hist ( ora_conn ) 
+
 ora_sess_info ( ora_conn ) 
 
 ora_time_spent ( ora_conn ) 
