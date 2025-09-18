@@ -97,6 +97,19 @@ sql_stats2 = """
 
 # -- -- -- functions... -- -- -- 
 
+def ora_get_mod ( ora_conn ):
+           
+  # get the module_id (string) for this connection: 
+  # others will use it to set-module, and to query for session-info.
+  # module_string should be max 48, and unique..
+  # for the moment: "mod_(sid,serial#)' (including the parentheses) 
+  # so typical would be : "mod_(42,2345)"
+
+  module_id = str ( 'mod_(' + str ( ora_conn.session_id ).strip()
+                  + ','     + str ( ora_conn.serial_num ).strip() + ')' )
+                
+  return module_id
+
 def ora_logon ( *args ):
 
   # customize this sql to show connetion info on logon
@@ -232,7 +245,9 @@ def ora_sess_info ( the_conn ):
     order by 1
     """
 
-  print ( ' ora_sess_info: Report out Session Stats ')
+  print ( ' ora_sess_info: Session Stats, '
+          , '(sid, serial)= (', the_conn.session_id, ',', the_conn.serial_num, ')'
+        )
   print ( ' ora_sess_info:     Value  Stat name \n ora_sess_info:   -------- -------------' ) 
 
   cur_stats = the_conn.cursor()
@@ -335,7 +350,7 @@ def ora_sess_hist ( the_conn ):
   # retun: mulitple columnms.. later version: return just 1 varchar, is easier
 
   sql_has_history ="""
-    select /* check sql_hist enabled */ 
+    select /* check params */ 
       decode ( p.value, 'TRUE', 1, 0 ) as result
     from v$version v
        , v$parameter p
@@ -364,8 +379,8 @@ def ora_sess_hist ( the_conn ):
   pp    ( ' ' )
   pp    ( '... SQL history, ordered by ela_us ...' )
   pp    ( ' ' )
-  pp    ( 'row  sql_id         exe_count ela_us   cpu_us   SQL' )
-  pp    ( '---- -------------- --------- -------- -------- -------- ... ' )
+  pp    ( 'row  sql_id          exe_count    ela_us   cpu_us      SQL ...' )
+  pp    ( '---- -------------- ---------- --------- -------- -------- ... ' )
 
   cursor = the_conn.cursor()
   for row in cursor.execute ( sql_hist_select ):
@@ -375,8 +390,59 @@ def ora_sess_hist ( the_conn ):
 
   return cursor.rowcount 
 
+
+def ora_sess_sqlarea ( the_conn ):
+
+  # pick the stmnts for the current session-module form sqlarea
+  # this assues the module_name was set for the connection using ora_get_module
+
+  def pp ( *args ):
+    print ( 'sess_sqlarea:', *args ) 
+    return 0
+
+  sql_get_sqlarea="""
+    select /* get sqlarea module */ 
+    /*** s.sql_id
+    , s.executions                            as nr_exe
+    , s.elapsed_time                          as ela_us
+    , s.cpu_time                              as cpu_us
+    --, s.elapsed_time / s.executions           as us_p_exe
+    , substr ( s.sql_text, 1, 60 )            as sql_txt
+    ***/
+    rpad ( s.sql_id, 14 )
+           ||  to_char (   sum (s.executions )   , '999999999' )
+           ||  to_char (   sum ( s.elapsed_time ), '999999999' )
+           ||  to_char (   sum ( s.cpu_time )    , '999999999' )  || ' '
+           ||  replace ( substr ( s.sql_text, 1, 50 ), chr(10), ' ' ) || '...'
+    from v$sql s
+    where ( s.sql_text like '--bla--xyz--'               -- only watermarked stmnts
+         or s.module      = :b_module )
+  group by s.sql_id, s.sql_text, s.elapsed_time
+  order by s.elapsed_time
+  """
+  # just 1 binvar: the moudule_name, normally from ora_get_mod
+
+  module_name = ora_get_mod ( the_conn )
+
+  pp    ( ' ' )
+  pp    ( '... SQL area for module:', module_name, ', ordered by ela_us ...' )
+  pp    ( ' ' )
+  pp    ( 'row  sql_id          exe_count    ela_us   cpu_us      SQL ...' )
+  pp    ( '---- -------------- ---------- --------- -------- -------- ... ' )
+
+  cur_sqlarea = the_conn.cursor ()
+  for row in cur_sqlarea.execute ( sql_get_sqlarea, b_module = module_name ):
+    pp   ( f"{cur_sqlarea.rowcount:4d}", row[0] )
+
+  pp ()
+
+  n_retval = cur_sqlarea.rowcount 
+  return n_retval
+
+  # ----- end of ora_sess_sqlarea:print sqlarea for session -----
+
 # -- --  ora_aas -- -- 
-# 
+ 
 # ora_aas_chk ( conn): allow python to sleep when oracle is too busy.
 #
 # note: 
@@ -522,12 +588,16 @@ sql_timers="""
 
 def ora_time_spent ( ora_conn ):
 
+  def pp ( *args ):
+    print ( ' ora_time_spent:', *args )
+    return 0
+
   pp ()
   pp ('Collecting time-data: nr-RTs, ping-time, process-time and elapsed time..' )
 
   # sample the ping-time..  try loop-call of n pings..
   n_counter = 5
-  sleep_s   = 1.0
+  sleep_s   = 0.1
   ping_ms   = 0.0
   total_ms  = 0.0
 
@@ -536,7 +606,7 @@ def ora_time_spent ( ora_conn ):
     total_ms   += ping_ms
 
     # optional sleep-time, similar to -i<sec>..
-    pp ('ping DB: ', ora_conn.service_name, ' seq=', n_loop, ' RTT=', ping_ms )
+    # pp ('ping DB: ', ora_conn.service_name, ' seq=', n_loop, ' RTT=', ping_ms )
     time.sleep( sleep_s )                             # should be configurable, -i<n>
     # tmr_spin ( sleep_s )                            # can spin to avoid "unaccountable" 
 
@@ -576,7 +646,7 @@ def ora_time_spent ( ora_conn ):
   pp ( ' App time (busy)  :' , f"{app_process_s:8.3f}", 'sec, = user + sys' )
   pp ( ' DB time          :' , f"{db_time_s:8.3f}"    , 'sec, via sess_time_model' )  
   pp ( ' Network time     :' , f"{netw_time_s:8.3f}"  , 'sec, (', n_rts, 'RTs x', round ( avg_ping_ms, 3), 'ms)' )  
-  pp ( ' Idle (wait)time? :' , f"{idle_time_s:8.3f}"  , 'sec, (e.g. 5x sleep betwn pings, or keyb-input, ...)' )
+  pp ( ' Idle (wait)time? :' , f"{idle_time_s:8.3f}"  , 'sec, (e.g. RTT or keyb-input, ...)' )
   pp ( '------------------  ----------' )
   pp ( 'Total time        :' , f"{total_time_s:8.3f}" , 'sec (from time.perf_counter_ns)' )
 
@@ -599,6 +669,10 @@ if __name__ == '__main__':
   print ()
 
   ora_conn = ora_logon ()
+
+  # set module to ID session
+  module_name = ora_get_mod ( ora_conn ) 
+  ora_conn.module = module_name 
 
   print ()
   print ( ' ---- if connected, init ora_aas ----- ' )
@@ -649,13 +723,21 @@ if __name__ == '__main__':
   ora_sess_inf2 ( ora_conn )
 
   print ()
-  print ( ' ---- final check: report history and time-spent ' )
+  print ( ' ---- almost final check: report history ' )
 
   ora_sess_hist ( ora_conn ) 
 
+  print ()
+  print ( ' ---- final check: report V$SQLAREA... ' )
+
+  ora_sess_sqlarea ( ora_conn ) 
+
+  print ()
+  print ( ' ---- report time spent...' )
+
   ora_time_spent ( ora_conn ) 
 
-  tmr_report_time()
+  # tmr_report_time()
 
   print ('Note: timings not accurately reported on small time-scale of the test.')
   print ()
