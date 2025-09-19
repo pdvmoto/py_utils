@@ -314,16 +314,10 @@ pp    ( ' ' )
 
 ora_conn = ora_logon () 
 
-ora_conn.module = 'ThisModule'
-
-# module_string should be max 48, and unique..
-# module_id = str ( 'mod_(' + str ( ora_conn.session_id ).strip() 
-#                 + ','     + str ( ora_conn.serial_num ).strip() + ')' )
-
 module_id       = ora_get_mod ( ora_conn ) 
 ora_conn.module = module_id
 
-# only needed for vectors
+# output-handler, only needed for vectors
 # ora_conn.outputtypehandler = output_type_handler
 
 pp    ( ' ' )
@@ -335,7 +329,7 @@ ora_sess_info ( ora_conn )
 ora_sess_hist ( ora_conn ) 
 
 pp    ( '1st history shown, Enter to continue... ' )
-some_input = input ( "...enter... > " )
+some_input = input ( ".. .. .. .. ...enter... > " )
 
 # pp    ( ' ' )
 # pp    ( ' At this point, should have a few RoundTrips and 1-2 centiseconds of DB time. ' )
@@ -360,7 +354,7 @@ label = 'first label'
 label_comment = 'comment  itm_id=' + str(itm_id) + ', src_id=' + str(src_id)
 label_score = 1 - ( 1 / itm_id )  
 
-# 1 insert, oritinally this was the test of the function
+# 1 insert, originally this was the test of the function
 pp    ( 'Inserting Label ', label ) 
 pp    ( ' ' )
 f_ins_label ( itm_id, src_id, label, label_score, label_comment )
@@ -372,10 +366,10 @@ ora_sess_hist ( ora_conn )
 
 pp    ( ' ' )
 pp    ( 'one insert done, how history, Enter to continue... ' )
-some_input = input ( "...enter... > " )
+some_input = input ( ".. .. .. .. .. ...enter... > " )
 
 # now do a series of inserts..
-nr_ins = 20
+nr_ins = 200
 do_indiv_inserts ( ora_conn, nr_ins )
 
 pp    ( 'added ', nr_ins, 'inserts via t1 , check history ' )
@@ -399,7 +393,7 @@ pp    ( 'added ', nr_ins, 'inserts via t1 , check history ' )
 some_input = input ( "...enter... > " )
 
 # now do a timed series of inserts..
-n_sec_test = 0.1
+n_sec_test = 1.1
 
 pp ( ' ' ) 
 pp ( 'Start: run test indiv for ', n_sec_test, ' sec.' )
@@ -444,7 +438,7 @@ pp    ( ' ' )
 
 ## ora_sess_info ( ora_conn ) 
 
-n_sec_test = 0.5
+n_sec_test = 5.5
 
 pp ( ' ' ) 
 pp   ( 'Start: run test list for ', n_sec_test, ' sec.' )

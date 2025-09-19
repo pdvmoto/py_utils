@@ -368,6 +368,15 @@ def ora_sess_hist ( the_conn ):
   cur_hist = the_conn.cursor ()
   cur_hist.execute ( sql_has_history )
   row = cur_hist.fetchone ()
+
+  if (  ( cur_hist.rowcount <  1 ) 
+     or ( int( row[0] )     != 1 )
+    ):
+    pp ( ' ' ) 
+    pp ( 'sql_history not available, check Version == 23ai, and SQL_HISTORY_ENABLED = True' )
+    pp ( ' ' ) 
+    return 0 
+
   if int( row[0] ) != 1:
     pp ( ' ' ) 
     pp ( 'sql_history not available, check Version == 23ai, and SQL_HISTORY_ENABLED = True' )
@@ -400,7 +409,7 @@ def ora_sess_sqlarea ( the_conn ):
     print ( 'sess_sqlarea:', *args ) 
     return 0
 
-  sql_get_sqlarea="""
+  sql_get_sess_sqlarea="""
     select /* get sqlarea module */ 
     /*** s.sql_id
     , s.executions                            as nr_exe
@@ -431,7 +440,7 @@ def ora_sess_sqlarea ( the_conn ):
   pp    ( '---- -------------- ---------- --------- -------- -------- ... ' )
 
   cur_sqlarea = the_conn.cursor ()
-  for row in cur_sqlarea.execute ( sql_get_sqlarea, b_module = module_name ):
+  for row in cur_sqlarea.execute ( sql_get_sess_sqlarea, b_module = module_name ):
     pp   ( f"{cur_sqlarea.rowcount:4d}", row[0] )
 
   pp ()
@@ -440,6 +449,56 @@ def ora_sess_sqlarea ( the_conn ):
   return n_retval
 
   # ----- end of ora_sess_sqlarea:print sqlarea for session -----
+
+def  ora_sqlarea ( the_conn ):
+
+  # stmnts from SQLAREA, orderded by Elapsed time..
+  # fine tune by eliminating SYS, 
+
+  def pp ( *args ):
+    print ( 'ora_sqlarea:', *args ) 
+    return 0
+
+  sql_get_sqlarea="""
+    select * from ( 
+    select /* get sqlarea module */ 
+    /*** s.sql_id
+    , s.executions                            as nr_exe
+    , s.elapsed_time                          as ela_us
+    , s.cpu_time                              as cpu_us
+    --, s.elapsed_time / s.executions           as us_p_exe
+    , substr ( s.sql_text, 1, 60 )            as sql_txt
+    ***/
+    rpad ( s.sql_id, 14 )
+           ||  to_char (   sum (s.executions )   ,           '99999999' )
+           ||  to_char (   sum ( s.elapsed_time / ( 1000) ), '99999999' ) || ' ' 
+           ||  replace ( substr ( s.sql_text, 1, 60 ), chr(10), ' ' ) || '...'
+    from v$sql s
+    where 1=1 
+      and parsing_user_id > 0  -- skip SYS
+    group by s.sql_id, s.sql_text, s.elapsed_time
+    order by s.elapsed_time desc 
+    )
+  FETCH FIRST 15 ROWS ONLY
+  """
+  # no binvar on this one
+
+  pp    ( ' ' )
+  pp    ( '... SQL-area, orederd by elapsed_ms  for DB-instance or PDB:', the_conn.service_name )
+  pp    ( ' ' )
+  pp    ( 'row  sql_id          exe_cnt   ela_ms SQL ...' )
+  pp    ( '---- -------------- -------- -------- -------- ... ' )
+
+  cur_sqlarea = the_conn.cursor ()
+  for row in cur_sqlarea.execute ( sql_get_sqlarea ):
+    pp   ( f"{cur_sqlarea.rowcount:4d}", row[0] )
+
+  pp ()
+
+  n_retval = cur_sqlarea.rowcount 
+  return n_retval
+
+  # ----- end of ora_sqlarea: sqlarea for instancw -----
 
 # -- --  ora_aas -- -- 
  
@@ -728,9 +787,14 @@ if __name__ == '__main__':
   ora_sess_hist ( ora_conn ) 
 
   print ()
-  print ( ' ---- final check: report V$SQLAREA... ' )
+  print ( ' ---- SESSION, check: report V$SQLAREA... ' )
 
   ora_sess_sqlarea ( ora_conn ) 
+
+  print ()
+  print ( ' ---- INSTANCE check: report V$SQLAREA... ' )
+
+  ora_sqlarea ( ora_conn ) 
 
   print ()
   print ( ' ---- report time spent...' )
