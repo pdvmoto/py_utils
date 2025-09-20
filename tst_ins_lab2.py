@@ -65,6 +65,8 @@ tmr_start ()
 
 # -- -- -- -- Constants and global list for Array inserts  -- -- -- -- -- 
 
+g_module_name = 'module_ins_label'
+
 itl_list         = []           # empty list for records, to be filled, inserted, re-used
 itl_list_max_len = 1000         # trigger SQL-Insert, and use for prefecth/arraysizes
 
@@ -314,8 +316,8 @@ pp    ( ' ' )
 
 ora_conn = ora_logon () 
 
-module_id       = ora_get_mod ( ora_conn ) 
-ora_conn.module = module_id
+module_name     = ora_get_mod ( ora_conn, g_module_name ) 
+ora_conn.module = module_name
 
 # output-handler, only needed for vectors
 # ora_conn.outputtypehandler = output_type_handler
@@ -438,7 +440,7 @@ pp    ( ' ' )
 
 ## ora_sess_info ( ora_conn ) 
 
-n_sec_test = 5.5
+n_sec_test = 1.5
 
 pp ( ' ' ) 
 pp   ( 'Start: run test list for ', n_sec_test, ' sec.' )
@@ -514,7 +516,7 @@ pp    ( ' ' )
 pp    ( 'loops done, show history... ' )
 ora_sess_hist ( ora_conn ) 
 
-the_sql="select /* t6 */ spinf_n( 1 ) from dual connect by level < 4" 
+the_sql="select /* t6 */ spinf_n( 1 ) from dual connect by level < 3" 
 
 f_do_sql_select ( ora_conn, the_sql )
 
@@ -551,10 +553,26 @@ f_do_manual_sql ( ora_conn )
 pp            ( 'manual SQL done, show history...' )
 ora_sess_hist ( ora_conn ) 
 
-ora_sess_sqlarea ( ora_conn ) 
+ora_module_sqlarea ( ora_conn ) 
 
 pp ( )
 ora_sess_info ( ora_conn ) 
+
+pp ( )
+pp ( 'list SQL for this run only, (SID,SEERIAL#) ' )
+module_name = ora_get_mod ( ora_conn, g_module_name ) 
+ora_module_sqlarea (          ora_conn,   module_name ) 
+
+pp ( )
+pp ( 'list SQL for All runs of ', g_module_name + '%' )
+ora_module_sqlarea (      ora_conn, g_module_name ) 
+
+pp ()
+pp ( 'SQL for ALL of INSTANCE... ' ) 
+ora_sqlarea ( ora_conn ) 
+
+# pp ( )
+# ora_sess_info ( ora_conn ) 
 
 pp ( )
 ora_time_spent ( ora_conn )  

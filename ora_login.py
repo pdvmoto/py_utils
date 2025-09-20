@@ -12,6 +12,7 @@
 # functions included
 #
 #   ora_logon ( *args )        - Actually picks up credentials from dotenv : .env
+#   ora_get_mod   ( conn,prog) - Get module_mame for conn, format "prog:(sid,serial)"
 #   ora_sess_info ( the_conn ) - reports on "totals" from v$mystat and v$sess_time_model
 #   ora_sess_inf2 ( the_conn ) - idem, but difference since previous call
 #   ora_sess_hist ( the_conn ) - stmnts from v$sql_history (if available...)
@@ -55,8 +56,10 @@ from duration   import *
 
 # -- -- -- Constants, notably SQL -- -- -- 
 
-# to get statistics from DB, adjust per demo..
+# name to set module..
+g_ora_module = 'ora_login_selftest'
 
+# to get statistics from DB, adjust per demo..
 sql_stats2 = """
   select /* s2 stats */ sn.name, st.value
   -- , st.*
@@ -97,7 +100,7 @@ sql_stats2 = """
 
 # -- -- -- functions... -- -- -- 
 
-def ora_get_mod ( ora_conn ):
+def ora_get_mod ( ora_conn, prog_name='a_python_prog' ):
            
   # get the module_id (string) for this connection: 
   # others will use it to set-module, and to query for session-info.
@@ -105,8 +108,9 @@ def ora_get_mod ( ora_conn ):
   # for the moment: "mod_(sid,serial#)' (including the parentheses) 
   # so typical would be : "mod_(42,2345)"
 
-  module_id = str ( 'mod_(' + str ( ora_conn.session_id ).strip()
-                  + ','     + str ( ora_conn.serial_num ).strip() + ')' )
+  # set module to "program:(sid,serial), to allow finding stmnts later
+  module_id = str ( prog_name + ':(' + str ( ora_conn.session_id ).strip()
+                  + ','       + str ( ora_conn.serial_num ).strip() + ')' )
                 
   return module_id
 
@@ -377,11 +381,11 @@ def ora_sess_hist ( the_conn ):
     pp ( ' ' ) 
     return 0 
 
-  if int( row[0] ) != 1:
-    pp ( ' ' ) 
-    pp ( 'sql_history not available, check Version == 23ai, and SQL_HISTORY_ENABLED = True' )
-    pp ( ' ' ) 
-    return 0 
+  #if int( row[0] ) != 1:
+  #  pp ( ' ' ) 
+  #  pp ( 'sql_history not available, check Version == 23ai, and SQL_HISTORY_ENABLED = True' )
+  #  pp ( ' ' ) 
+  #  return 0 
 
   # if we get here: we can look for sql_history...
 
@@ -400,55 +404,73 @@ def ora_sess_hist ( the_conn ):
   return cursor.rowcount 
 
 
-def ora_sess_sqlarea ( the_conn ):
+def ora_module_sqlarea ( the_conn, the_module='%' ):
 
   # pick the stmnts for the current session-module form sqlarea
   # this assues the module_name was set for the connection using ora_get_module
+  # alternatively it can list all of the SQL
 
   def pp ( *args ):
-    print ( 'sess_sqlarea:', *args ) 
+    print ( 'ora_module_sql:', *args ) 
     return 0
 
-  sql_get_sess_sqlarea="""
-    select /* get sqlarea module */ 
-    /*** s.sql_id
-    , s.executions                            as nr_exe
-    , s.elapsed_time                          as ela_us
-    , s.cpu_time                              as cpu_us
-    --, s.elapsed_time / s.executions           as us_p_exe
-    , substr ( s.sql_text, 1, 60 )            as sql_txt
-    ***/
-    rpad ( s.sql_id, 14 )
-           ||  to_char (   sum (s.executions )   , '999999999' )
-           ||  to_char (   sum ( s.elapsed_time ), '999999999' )
-           ||  to_char (   sum ( s.cpu_time )    , '999999999' )  || ' '
-           ||  replace ( substr ( s.sql_text, 1, 50 ), chr(10), ' ' ) || '...'
-    from v$sql s
-    where ( s.sql_text like '--bla--xyz--'               -- only watermarked stmnts
-         or s.module      = :b_module )
-  group by s.sql_id, s.sql_text, s.elapsed_time
-  order by s.elapsed_time
+  n_maxrows = 100 
+
+  sql_get_module_sqlarea="""
+    select /* get sqlarea module */ s.result_txt from 
+    ( select 
+      /*** s.sql_id
+      , s.executions                            as nr_exe
+      , s.elapsed_time                          as ela_us
+      , s.cpu_time                              as cpu_us
+      --, s.elapsed_time / s.executions           as us_p_exe
+      , substr ( s.sql_text, 1, 60 )            as sql_txt
+      ***/
+      '' 
+       || to_char (   sum ( s.elapsed_time ), '9999999999' )
+       || to_char (   sum ( s.executions )  , '999999999' )      || '  ' 
+       || rpad ( s.sql_id, 14 ) || ' '
+       || replace ( substr ( s.sql_text, 1, 60 ), chr(10), ' ' ) || '...' as result_txt
+       , s.elapsed_time                                                   as ela_us
+      from v$sqlarea s
+      where 1=1  
+        and s.module like :b_module || '%' 
+      group by s.sql_id, s.sql_text, s.elapsed_time
+      order by s.elapsed_time desc
+      FETCH FIRST :b_maxrows ROWS ONLY
+    ) s 
+  order by s.ela_us 
   """
-  # just 1 binvar: the moudule_name, normally from ora_get_mod
+  # just 2 binvar: the moudule_name, and maxrows
 
-  module_name = ora_get_mod ( the_conn )
+  # why do we need to assign paramteer to local ???
+  like_module = the_module
 
   pp    ( ' ' )
-  pp    ( '... SQL area for module:', module_name, ', ordered by ela_us ...' )
+  pp    ( '... SQL found for module: [', like_module + '% ]' )
   pp    ( ' ' )
-  pp    ( 'row  sql_id          exe_count    ela_us   cpu_us      SQL ...' )
-  pp    ( '---- -------------- ---------- --------- -------- -------- ... ' )
+  pp    ( 'row  ela_us      exe_count  sql_id         SQL ...' )
+  pp    ( '---- ----------- ---------  -------------  ---------- - ... ' )
 
   cur_sqlarea = the_conn.cursor ()
-  for row in cur_sqlarea.execute ( sql_get_sess_sqlarea, b_module = module_name ):
+  for row in cur_sqlarea.execute ( sql_get_module_sqlarea
+                                 ,  b_module = like_module
+                                 , b_maxrows = n_maxrows 
+  ):
     pp   ( f"{cur_sqlarea.rowcount:4d}", row[0] )
 
+  n_retval = cur_sqlarea.rowcount 
+
+  pp ()
+  pp ( 'module: [', like_module, ' ], found:', n_retval, 'stmnts.' )
+  if (n_retval == 100):
+    pp ( '(list is limited to max 100 distinct stmnts)')
   pp ()
 
-  n_retval = cur_sqlarea.rowcount 
+
   return n_retval
 
-  # ----- end of ora_sess_sqlarea:print sqlarea for session -----
+  # ----- end of ora_module_sqlarea:print sqlarea for session -----
 
 def  ora_sqlarea ( the_conn ):
 
@@ -461,25 +483,27 @@ def  ora_sqlarea ( the_conn ):
 
   sql_get_sqlarea="""
     select * from ( 
-    select /* get sqlarea module */ 
-    /*** s.sql_id
-    , s.executions                            as nr_exe
-    , s.elapsed_time                          as ela_us
-    , s.cpu_time                              as cpu_us
-    --, s.elapsed_time / s.executions           as us_p_exe
-    , substr ( s.sql_text, 1, 60 )            as sql_txt
-    ***/
-    rpad ( s.sql_id, 14 )
-           ||  to_char (   sum (s.executions )   ,           '99999999' )
-           ||  to_char (   sum ( s.elapsed_time / ( 1000) ), '99999999' ) || ' ' 
-           ||  replace ( substr ( s.sql_text, 1, 60 ), chr(10), ' ' ) || '...'
-    from v$sql s
-    where 1=1 
-      and parsing_user_id > 0  -- skip SYS
-    group by s.sql_id, s.sql_text, s.elapsed_time
-    order by s.elapsed_time desc 
+      select /* get sqlarea module */ 
+      /*** s.sql_id
+      , s.executions                            as nr_exe
+      , s.elapsed_time                          as ela_us
+      , s.cpu_time                              as cpu_us
+      --, s.elapsed_time / s.executions           as us_p_exe
+      , substr ( s.sql_text, 1, 60 )            as sql_txt
+      ***/
+      rpad ( s.sql_id, 14 )
+             ||  to_char (   sum (s.executions )   ,           '99999999' )
+             ||  to_char (   sum ( s.elapsed_time / ( 1000) ), '99999999' ) || ' ' 
+             ||  replace ( substr ( s.sql_text, 1, 60 ), chr(10), ' ' ) || '...'
+      , s.elapsed_time                          as ela_us
+      from v$sql s
+      where 1=1 
+        and parsing_user_id > 0  -- skip SYS
+      group by s.sql_id, s.sql_text, s.elapsed_time
+      order by s.elapsed_time desc 
+      FETCH FIRST 10 ROWS ONLY
     )
-  FETCH FIRST 15 ROWS ONLY
+  order by ela_us  -- now show highest ela at bottom
   """
   # no binvar on this one
 
@@ -716,7 +740,7 @@ def ora_time_spent ( ora_conn ):
 # ---- some  test code below... ---- 
 
 sql_test = """
-  select object_type, count (*) 
+  select /* ora_login: Selftest */ object_type, count (*) 
     from user_objects 
    group by object_type  
 """
@@ -729,8 +753,8 @@ if __name__ == '__main__':
 
   ora_conn = ora_logon ()
 
-  # set module to ID session
-  module_name = ora_get_mod ( ora_conn ) 
+  # set module to ID program and session
+  module_name = ora_get_mod ( ora_conn, g_ora_module ) 
   ora_conn.module = module_name 
 
   print ()
@@ -782,18 +806,30 @@ if __name__ == '__main__':
   ora_sess_inf2 ( ora_conn )
 
   print ()
-  print ( ' ---- almost final check: report history ' )
+  print ( ' ---- almost final check: report history (23ai only)' )
 
   ora_sess_hist ( ora_conn ) 
 
   print ()
-  print ( ' ---- SESSION, check: report V$SQLAREA... ' )
+  print ( ' ---- SESSION, check: report V$SQLAREA, precisely this session-only... ' )
 
-  ora_sess_sqlarea ( ora_conn ) 
+  # suffix the global by (sid,serial), for more precise select-like
+  module_name = ora_get_mod ( ora_conn, g_ora_module )
+  ora_module_sqlarea ( ora_conn, module_name ) 
 
   print ()
-  print ( ' ---- INSTANCE check: report V$SQLAREA... ' )
+  print ( ' ---- MODULE check: report V$SQLAREA, any SQL by this module... ' )
 
+  # just list anything like g_ora_module%
+  ora_module_sqlarea ( ora_conn, g_ora_module ) 
+
+  print ()
+  print ( ' ---- INSTANCE check: report V$SQLAREA, use module=% ... ' )
+  ora_module_sqlarea ( ora_conn ) 
+
+  # all of SQLAREA
+
+  print ( ' ---- INSTANCE check: report V$SQLAREA, old function  ... ' )
   ora_sqlarea ( ora_conn ) 
 
   print ()
