@@ -8,34 +8,44 @@
 # grants needed:  (can we get round these... ? )
 #   grant select on v_$mystat, v_$version, v_$statname, v_$sess_time_model to ... 
 #   grant select on v_$sysstat, v_$parameter to ... 
+#   
+# for use of ora_module_sqlarea and ora_sess_hist:
+#   grant select on v$sql_history to ...
+#   grant select on v$sqlarea to ...
+#   grant advisor to ...  ( <== Recommended fix-all )
 # 
-# functions included
+# functions included in this file
 #
 #   ora_logon ( *args )        - Actually picks up credentials from dotenv : .env
 #   ora_get_mod   ( conn,prog) - Get module_mame for conn, format "prog:(sid,serial)"
 #   ora_sess_info ( the_conn ) - reports on "totals" from v$mystat and v$sess_time_model
 #   ora_sess_inf2 ( the_conn ) - idem, but difference since previous call
-#   ora_sess_hist ( the_conn ) - stmnts from v$sql_history (if available...)
 #
-#   ora_aas_chk ( the_conn )   - check how busy RDBMS is, do pause-sleep if necessary
+#   ora_sess_hist ( the_conn )                        - use v$sql_history (if available...) v23ai only.
+#   ora_module_sqlarea ( the_conn, the_module='%' )   - list SQL from v$sqlarea (all versions)
+#   ora_sqlarea ( the_conn )                          - old function to list v$sqlarea, max 10 lines
 #
-#   ora_rt_1ping ( the_conn )  - do 1 ping over the connection, report back ms (milliseconds)
+#   ora_aas_chk ( the_conn )     - check how busy RDBMS is, do pause-sleep if necessary
+#
+#   ora_rt_1ping ( the_conn )    - do 1 ping over the connection, report back ms (milliseconds)
 #   ora_time_spent ( the_conn )  - report time spent by program: python + RDBMS + Network + idle
 #
 #
 # Dependencies:
-#   duration.py : timing info
-#   prefix.py   : pp for timed-print
+#   duration.py    : for the timer
+#   ?? prefix.py   : pp for timed-print - not any more..
+#   dotenv         : credentials for ora_logon, feel free to use smthng else
 #
 # todo: 
-# - timing,.. should we load duration.py at the very top ? => test!
-# - later: allow un/pwd@host:port\sid to be passed, but prefer dotenv 
+# - timing,.. should we load duration.py at the very top ? => tested, very small diff
+# - later: allow un/pwd@host:port\sid to be passed, but prefer dotenv for now
 # - help text in case dot-env file is not found !!!
 # - self-made include-files: duration, prefix,.. really ?
-# - logon + sess_info: avoid dependency on v$ ... hmmm ??
+# - logon + sess_info: avoid dependency on v$ ... hmmm ?? Recommend "Advisor" role
 # - aas : dflt pause on (SQL)error, use cursor.parse to test..
 # - include ora_aas: find aas and allow throttling/sleep.
 #   if no aas-found, no conn, simply pause bcse no useful work possible
+# - check whether conn.module_name takes an extra round-trip ?
 # 
 # info: unless prefetch is increased,... 
 #   Apparently connect takes 2 round trips.
@@ -46,20 +56,19 @@
 import    os
 import    time
 import    oracledb
-from      dotenv   import load_dotenv
+from      dotenv        import load_dotenv
 
-# we use those..., 
+# we use duration.py for "stopwatch tmr" ..., 
+from      duration     import *
+# from    prefix       import *
 
-from prefix     import *
-from duration   import *
 
-
-# -- -- -- Constants, notably SQL -- -- -- 
+# -- -- -- -- -- Constants, notably SQL -- -- -- -- -- 
 
 # name to set module..
 g_ora_module = 'ora_login_selftest'
 
-# to get statistics from DB, adjust per demo..
+# to get statistics from DB, can adjust per demo..
 sql_stats2 = """
   select /* s2 stats */ sn.name, st.value
   -- , st.*
@@ -406,26 +415,14 @@ def ora_sess_hist ( the_conn ):
 
 def ora_module_sqlarea ( the_conn, the_module='%' ):
 
-  # pick the stmnts for the current session-module form sqlarea
+  # pick stmnts form sqlarea
+  # using the module like yzt, we vary how much we select
   # this assues the module_name was set for the connection using ora_get_module
-  # alternatively it can list all of the SQL
-
-  def pp ( *args ):
-    print ( 'ora_module_sql:', *args ) 
-    return 0
-
-  n_maxrows = 100 
+  # if no module is specified: all of sqlarea
 
   sql_get_module_sqlarea="""
     select /* get sqlarea module */ s.result_txt from 
     ( select 
-      /*** s.sql_id
-      , s.executions                            as nr_exe
-      , s.elapsed_time                          as ela_us
-      , s.cpu_time                              as cpu_us
-      --, s.elapsed_time / s.executions           as us_p_exe
-      , substr ( s.sql_text, 1, 60 )            as sql_txt
-      ***/
       '' 
        || to_char (   sum ( s.elapsed_time ), '9999999999' )
        || to_char (   sum ( s.executions )  , '999999999' )      || '  ' 
@@ -441,8 +438,16 @@ def ora_module_sqlarea ( the_conn, the_module='%' ):
     ) s 
   order by s.ela_us 
   """
-  # just 2 binvar: the moudule_name, and maxrows
+  # sql has 2 binvar: the moudule, and maxrows
 
+  n_maxrows = 100   # in case we want to ...
+
+  # local prefix
+  def pp ( *args ):
+    print ( 'ora_sql_area:', *args ) 
+    return 0
+
+  n_maxrows = 100 
   # why do we need to assign paramteer to local ???
   like_module = the_module
 
@@ -636,6 +641,7 @@ def ora_aas_chk ( conn_obj ):
 
 # 
 # ping function to sample RTT, return milliseconds (float)
+
 def ora_rt_1ping ( ora_conn ):
 
   n_start = time.perf_counter_ns()        # use nano for precision?
@@ -675,7 +681,7 @@ def ora_time_spent ( ora_conn ):
     print ( ' ora_time_spent:', *args )
     return 0
 
-  pp ()
+  pp ( )
   pp ('Collecting time-data: nr-RTs, ping-time, process-time and elapsed time..' )
 
   # sample the ping-time..  try loop-call of n pings..
@@ -691,7 +697,6 @@ def ora_time_spent ( ora_conn ):
     # optional sleep-time, similar to -i<sec>..
     # pp ('ping DB: ', ora_conn.service_name, ' seq=', n_loop, ' RTT=', ping_ms )
     time.sleep( sleep_s )                             # should be configurable, -i<n>
-    # tmr_spin ( sleep_s )                            # can spin to avoid "unaccountable" 
 
   avg_ping_ms = total_ms / n_counter
 
@@ -740,10 +745,13 @@ def ora_time_spent ( ora_conn ):
 # ---- some  test code below... ---- 
 
 sql_test = """
-  select /* ora_login: Selftest */ object_type, count (*) 
-    from user_objects 
-   group by object_type  
+  select /* ora_login: Selftest */ 
+    object_type, count (*) 
+  from user_objects 
+  group by object_type  
 """
+
+# -- -- -- -- -- MAIN - self-test starts here -- -- -- -- --
 
 if __name__ == '__main__':
 
@@ -806,41 +814,34 @@ if __name__ == '__main__':
   ora_sess_inf2 ( ora_conn )
 
   print ()
-  print ( ' ---- almost final check: report history (23ai only)' )
+  print ( ' ---- report v$sql_history (contains version-check, 23ai only)' )
 
   ora_sess_hist ( ora_conn ) 
 
   print ()
-  print ( ' ---- SESSION, check: report V$SQLAREA, precisely this session-only... ' )
-
-  # suffix the global by (sid,serial), for more precise select-like
-  module_name = ora_get_mod ( ora_conn, g_ora_module )
-  ora_module_sqlarea ( ora_conn, module_name ) 
+  print ( ' ---- INSTANCE check: report V$SQLAREA, use default module = % ... ' )
+  ora_module_sqlarea ( ora_conn ) 
 
   print ()
   print ( ' ---- MODULE check: report V$SQLAREA, any SQL by this module... ' )
 
-  # just list anything like g_ora_module%
+  # just list anything like g_ora_module%, recommended general usage.
   ora_module_sqlarea ( ora_conn, g_ora_module ) 
 
   print ()
-  print ( ' ---- INSTANCE check: report V$SQLAREA, use module=% ... ' )
-  ora_module_sqlarea ( ora_conn ) 
+  print ( ' ---- SESSION, check: report V$SQLAREA, precisely this session-only... ' )
 
-  # all of SQLAREA
-
-  print ( ' ---- INSTANCE check: report V$SQLAREA, old function  ... ' )
-  ora_sqlarea ( ora_conn ) 
+  # suffix the global "g_ora_module:(sid,serial#)", for more precise select-like
+  module_name = ora_get_mod ( ora_conn, g_ora_module )
+  ora_module_sqlarea ( ora_conn, module_name ) 
 
   print ()
-  print ( ' ---- report time spent...' )
+  print ( ' ---- report time spent: DB-time + App-time + Netework-time + Idle-time = Total' )
 
   ora_time_spent ( ora_conn ) 
 
-  # tmr_report_time()
-
-  print ('Note: timings not accurately reported on small time-scale of the test.')
+  print ( ' ---- Note: timings not accurately reported on small time-scale of self-test.')
   print ()
-  print ( ' ---- ora_login.py: various functions tested with current session ---- ' ) 
+  print ( ' ---- ora_login.py: self-test of various functions done. ---- ' ) 
   print ()
 

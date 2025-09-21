@@ -305,6 +305,21 @@ def do_indiv_inserts ( ora_conn, nr_ins ):
 
   return n_counter
 
+# ------ end of f_do_indiv_insert ------
+
+
+# create a test-table if possible
+f_cre_tst_tbl ( the_conn ):
+
+  sq_cre_tst_tbl="""o
+  creat if not exists 
+  """
+
+  return n_retval
+
+# ------ created test table ------ 
+
+
 # ------ start of main ---------- 
 
 pp    ( ' ' ) 
