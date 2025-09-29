@@ -80,7 +80,7 @@ sql_stats2 = """
       -- or sn.name like 'bytes rece%client'
          or sn.name like '%execute count%'
          or sn.name like 'user calls'
-      -- or sn.name like 'user commits'
+         or sn.name like 'user commits'
       -- or sn.name like 'user rollbacks'
       -- or sn.name like 'consistent gets'
       -- or sn.name like 'db block gets'
@@ -88,6 +88,7 @@ sql_stats2 = """
       -- or sn.name like 'opened cursors curr%'
       -- or sn.name like '%sorts%'
       -- or sn.name like '%physical reads'
+         or sn.name like '%pga%'
          or sn.name like '%arse count (hard%'
          or sn.name like 'DB time'
       )
@@ -219,59 +220,21 @@ def ora_sess_info ( the_conn ):
   #  1 user call 
   #  1 execute  
   #  1 sort (memory)
-  #  other overhead depends on how many rows..
+  #  other overhead may depend on how many rows..
   # 
-  sql_stats = """
-    select sn.name, st.value
-    -- , st.*
-    from v$mystat st
-    , v$statname sn
-    where st.statistic# = sn.statistic# 
-    and (     sn.name like '%roundtrips%client%'
-        -- or sn.name like 'bytes sent%client'
-        -- or sn.name like 'bytes rece%client'
-           or sn.name like '%execute count%'
-           or sn.name like 'user calls'
-        --or sn.name like 'user commits'
-        --or sn.name like 'user rollbacks'
-        -- or sn.name like 'consistent gets'
-        -- or sn.name like 'db block gets'
-        -- or sn.name like 'opened cursors current'
-        -- or sn.name like 'opened cursors curr%'
-        -- or sn.name like '%sorts%'
-        -- or sn.name like '%physical reads'
-        or sn.name like '%arse count (hard%'
-        or sn.name like 'DB time'
-        )
-    UNION ALL
-    select ' ~ ', 0 from dual
-    union all
-    select ' ' || stm.stat_name || ' (micro-sec)'
-         , stm.value
-    from v$sess_time_model  stm
-    where stm.sid =  sys_context('userenv', 'sid')
-      and (  stm.stat_name like 'DB time'
-          or stm.stat_name like 'DB CPU'
-          or stm.stat_name like 'sql execu%'
-          or stm.stat_name like 'PL/SQL execu%'
-          )
-    order by 1
-    """
-
   print ( ' ora_sess_info: Session Stats, '
           , '(sid, serial)= (', the_conn.session_id, ',', the_conn.serial_num, ')'
         )
   print ( ' ora_sess_info:     Value  Stat name \n ora_sess_info:   -------- -------------' ) 
 
   cur_stats = the_conn.cursor()
-  cur_stats.prefetchrows = 30      # set to limit round trips
+  cur_stats.prefetchrows = 30      # set high to limit round trips
 
   # optional: parse to test the cursor.. return on err..j
   # but only when needed: it is 1 extra RT
   # cur_stats.parse ( sql_stats2 )  
 
   for row in cur_stats.execute ( sql_stats2 ):
-    # print ( ' stats : ', row[1], ' ', row[0] )
     print   ( ' ora_sess_info: ', f"{row[1]:8.0f}  {row[0]}"   )
 
   return 0 # -- -- -- -- ora_sess_info
@@ -331,7 +294,13 @@ def ora_sess_inf2 ( the_conn ):
 
 #
 # try finding SQL-history for the session
-# consider: overriding pp ( )
+# 
+# if old version: print error, return -1 ?
+# if param not set: print warning, return -2 ?
+# if history found: 
+#     list history by elepased_time..
+#     print settings: sid, buffers, nr records.
+#     return nr lines ? 
 #
 def ora_sess_hist ( the_conn ):
 
@@ -344,15 +313,16 @@ def ora_sess_hist ( the_conn ):
 
   sql_hist_select="""
     select /* vsql_hist ******  sql_id
-    --, to_char ( h.sql_exec_start, 'HH24:MI:SS' ) as start_tm
+      , to_char ( h.sql_exec_start, 'HH24:MI:SS' ) as start_tm
       , h.elapsed_time ela_us
-    --, h.cpu_time cpu_us, h.buffer_gets buff_g
+      , h.cpu_time cpu_us, h.buffer_gets buff_g
       , replace ( substr ( h.sql_text, 1, 70 ), chr(10), '|' ) sql_txt
       , h.key ***/
-     rpad ( h.sql_id, 14 )
-       ||  to_char ( count (*)               , '999999999' )
-       ||  to_char (   sum ( h.elapsed_time ), '999999999' )
-       ||  to_char (   sum ( h.cpu_time )    , '999999999' )  || ' '
+           '' 
+       ||  to_char ( count (*)               ,  '999999999' )
+       ||  to_char (   sum ( h.elapsed_time ), '9999999999' )
+       ||  to_char (   sum ( h.cpu_time )    , '9999999999' )  || '  '
+       ||  rpad ( h.sql_id, 14 ) || '  ' 
        ||  replace ( substr ( h.sql_text, 1, 50 ), chr(10), ' ' ) || '...'
     from v$sql_history h
     where 1=1
@@ -401,8 +371,8 @@ def ora_sess_hist ( the_conn ):
   pp    ( ' ' )
   pp    ( '... SQL history, ordered by ela_us ...' )
   pp    ( ' ' )
-  pp    ( 'row  sql_id          exe_count    ela_us   cpu_us      SQL ...' )
-  pp    ( '---- -------------- ---------- --------- -------- -------- ... ' )
+  pp    ( 'row   exe_count     ela_us     cpu_us  sql_id          SQL ...' )
+  pp    ( '---- ---------- ----------  ---------  --------------  -------- ... ' )
 
   cursor = the_conn.cursor()
   for row in cursor.execute ( sql_hist_select ):
@@ -677,12 +647,13 @@ sql_timers="""
 
 def ora_time_spent ( ora_conn ):
 
+  # local pp
   def pp ( *args ):
     print ( ' ora_time_spent:', *args )
     return 0
 
-  pp ( )
-  pp ('Collecting time-data: nr-RTs, ping-time, process-time and elapsed time..' )
+  # pp ( )
+  # pp ('Collecting time-data: nr-RTs, ping-time, process-time and elapsed time..' )
 
   # sample the ping-time..  try loop-call of n pings..
   n_counter = 5
@@ -734,9 +705,10 @@ def ora_time_spent ( ora_conn ):
   pp ( ' App time (busy)  :' , f"{app_process_s:8.3f}", 'sec, = user + sys' )
   pp ( ' DB time          :' , f"{db_time_s:8.3f}"    , 'sec, via sess_time_model' )  
   pp ( ' Network time     :' , f"{netw_time_s:8.3f}"  , 'sec, (', n_rts, 'RTs x', round ( avg_ping_ms, 3), 'ms)' )  
-  pp ( ' Idle (wait)time? :' , f"{idle_time_s:8.3f}"  , 'sec, (e.g. RTT or keyb-input, ...)' )
+  pp ( ' Idle (wait)time? :' , f"{idle_time_s:8.3f}"  , 'sec, (e.g. keyb-input, ...)' )
   pp ( '------------------  ----------' )
   pp ( 'Total time        :' , f"{total_time_s:8.3f}" , 'sec (from time.perf_counter_ns)' )
+  pp ( ' ' ) 
 
 
   return 0    # -- -- -- end ora_time_spent () -- -- -- 
@@ -814,11 +786,6 @@ if __name__ == '__main__':
   ora_sess_inf2 ( ora_conn )
 
   print ()
-  print ( ' ---- report v$sql_history (contains version-check, 23ai only)' )
-
-  ora_sess_hist ( ora_conn ) 
-
-  print ()
   print ( ' ---- INSTANCE check: report V$SQLAREA, use default module = % ... ' )
   ora_module_sqlarea ( ora_conn ) 
 
@@ -834,6 +801,11 @@ if __name__ == '__main__':
   # suffix the global "g_ora_module:(sid,serial#)", for more precise select-like
   module_name = ora_get_mod ( ora_conn, g_ora_module )
   ora_module_sqlarea ( ora_conn, module_name ) 
+
+  print ()
+  print ( ' ---- report v$sql_history (contains version-check, 23ai only)' )
+
+  ora_sess_hist ( ora_conn ) 
 
   print ()
   print ( ' ---- report time spent: DB-time + App-time + Netework-time + Idle-time = Total' )
