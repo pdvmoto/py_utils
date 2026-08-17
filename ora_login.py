@@ -537,8 +537,8 @@ def ora_aas_chk ( conn_obj ):
   load_dotenv()
 
   # get env ... (what if not in env?)
-  ora_aas_threshold_pct    = float ( str ( os.getenv ( 'ORA_AAS_THRESHOLD_PCT' ) ) )
-  ora_aas_pause_sec        = int   ( str ( os.getenv ( 'ORA_AAS_PAUSE_SEC'     ) ) )
+  ora_aas_threshold_pct    = float ( str ( os.getenv ( 'ORA_AAS_THRESHOLD_PCT' , default=50 ) ) )
+  ora_aas_pause_sec        = int   ( str ( os.getenv ( 'ORA_AAS_PAUSE_SEC'     , default=10 ) ) )
 
   print (   'ora_aas: threshold_pct =', ora_aas_threshold_pct
         , '\nora_aas: pause_sec     =', ora_aas_pause_sec )
