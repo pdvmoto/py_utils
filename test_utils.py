@@ -12,6 +12,11 @@ print ( ' ---- test_utils.py first do imports ..--- ' )
 import    time
 from      datetime  import  datetime 
 
+# import    requests
+
+import json
+import pprint 
+
 print ( 'for the record: perfcount and process_time: ', time.perf_counter(), time.process_time() )
 print ()
 
@@ -25,6 +30,9 @@ from  inspect_obj   import *
 from  throttle      import *
 from  prefix        import *
 from  ora_login     import *
+
+# new
+from request_wrap import *
 
 
 # test code
@@ -128,11 +136,82 @@ print ( )
 
 print ( ' -- testing sleep visual .. ' )
 print ( ' ')
-f_sleep_visual ( 5 )
+f_sleep_visual ( 4 )
 print ( ' ')
 print ( ' -- tested  sleep visual .. ' )
 print ( ' ')
 
+pp (  ' -- request_wrap -- ')
 
 
+the_url=str ( "https://api.overheid.io/voertuiggegevens/r323pg" )
+# r = get_wrapped("https://example.com")
+r = get_wrapped(the_url)
+
+pp(r.status_code)
+pp(r)
+
+f_inspect_obj ( 'r ', r )
+
+for item in dir(r):
+    pp(" -- items in return: ", item, "=", getattr(r, item))
+
+pp ()
+
+the_url=str ( "https://api.ipify.org?format=json" )
+r = get_wrapped(the_url)
+
+pp ()
+pp(r.status_code)
+pp(r)
+pp ()
+
+f_inspect_obj ( 'r ', r )
+
+pp()
+
+for item in dir(r):
+    pp(" -- items in return: ", item, "=", getattr(r, item))
+
+# https://bored-api.appbrewery.com/filter?type=education
+the_url= str (' https://bored-api.appbrewery.com/filter?type=education' )
+
+r = get_wrapped(the_url)
+pp ()
+pp (r.status_code)
+pp (r)
+pp ()
+
+f_inspect_obj ( 'r ', r )
+
+# hope to print reply..
+
+pp ()
+pp ( ' pretty printting of headers and text:')
+pp ()
+json_data= getattr ( r, 'headers' ) 
+pprint.pprint(json_data, compact=True)
+
+pp ()
+json_data= getattr ( r, 'text' ) 
+pprint.pprint(json_data, compact=True)
+
+pp()
+
+hit_enter = input ( "check pretty print of headers and text, ...., hit enter.." )
+
+for item in dir(r):
+    pp(" -- items in return: ", item, "=", getattr(r, item))
+pp ()
+
+pp ( "content: \n",  json.dumps ( json.loads ( getattr ( r, 'content') ) , indent=2 ), "\n" )
+
+pp ()
+
+pp ( "text: \n",     json.dumps ( json.loads ( getattr ( r, 'text'   ) ), indent=2 ), "\n" )
+
+report_requests ()
+pp ()
+tmr_report_time () 
+pp ()
 pp    ( ' ----- testing done..  ---- ' ) 

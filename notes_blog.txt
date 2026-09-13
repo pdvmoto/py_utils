@@ -1,0 +1,39 @@
+
+
+The real skill isn’t in knowing everything. It’s in knowing enough, asking good questions, and translating complexity into something practical and actionable.
+
+nog een belangrijke kleinigheid vergeten: bulk-processing versus row-by-row.
+als we dit van te voren inbouwen scheele dat veel tijd en typewerk-achteraf.
+
+voor een cursor is dit vaak mijn initiele-poiing, maar dit is inefficient:
+cursor.execute ( sqltmnt  
+,  var1=1
+,  var2=2
+,  var3=3
+....
+)
+want dit doet 1 roundtrip (milli(sces)) en toch maar 1 record
+ 
+beter en preferable: 
+cursor.executemany ( sqltmnt, listoftuples )
+met executemany doet 1 roundtrip plotseling len(listoftuples) up to 1000s records in 1 keer 
+(of in een minmaal aantal Roundtrips, afh van de connection-properties en de cursor-properties) 
+
+
+om dit voor elkaar te krijgen: stel in vroeg stadium een listoftuples samen:
+
+list = [
+( var1, var2, var3.... ) 
+( var1, var2, var3.... ) 
+...
+]
+
+en dat gaat het beste met :
+tupel = ( var1, var2, var3, ...)
+en dan:
+listoftuples.append ( tupel)
+
+
+E#xcuses dat ik hier niet aan toe kwam, vrijdag was wat hectisch,
+en ik had ook nog GJ Scheele naast me... 
+
