@@ -59,11 +59,14 @@ import    oracledb
 from      dotenv        import load_dotenv
 
 # we use duration.py for "stopwatch tmr" ..., 
-from      duration     import *
+# from      duration     import *
 # from    prefix       import *
 
 
 # -- -- -- -- -- Constants, notably SQL -- -- -- -- -- 
+
+# start time 
+start_proctim_ns = time.process_time_ns ()
 
 # name to set module..
 g_ora_module = 'ora_login_selftest'
@@ -688,7 +691,9 @@ def ora_time_spent ( ora_conn ):
   # note: can eliminate some lines, but keep them for clarity
   nano_to_sec    = int ( 1000 * 1000 * 1000 )
   app_process_ns = time.process_time_ns ()                      # this seems to start at 0
-  ela_time_ns    = time.perf_counter_ns() - g_durat_proctim_ns  # perf_counter =~ epoch ? 
+
+  # ela_time_ns  = time.perf_counter_ns() - g_durat_proctim_ns  # perf_counter =~ epoch ? 
+  ela_time_ns    = time.perf_counter_ns() - start_proctim_ns  # perf_counter =~ epoch ? 
 
   # wrap it up: network time, total time..
 
